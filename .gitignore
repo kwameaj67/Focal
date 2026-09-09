@@ -1,0 +1,19 @@
+# Xcode / SwiftPM
+.DS_Store
+/.build
+/Packages
+xcuserdata/
+DerivedData/
+# Track the shared scheme so a fresh clone can build without Xcode having to
+# synthesize one; keep per-user state out.
+.swiftpm/*
+!.swiftpm/xcode
+.swiftpm/xcode/*
+!.swiftpm/xcode/xcshareddata
+.swiftpm/**/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+
+# Package.resolved IS tracked. It is conventional to ignore it for a library,
+# but this package pins nothing tighter than "from:", so an unpinned resolve
+# silently picks up new dependency majors and changes what CI builds.
