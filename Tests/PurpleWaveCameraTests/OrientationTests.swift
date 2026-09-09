@@ -64,16 +64,16 @@ final class OrientationTests: XCTestCase {
     func testCaptureOrientationSwapsLandscape() {
         // The key invariant: a device held landscape-left must record with a
         // landscape-right connection to come out upright, and vice versa.
-        XCTAssertEqual(UIDeviceOrientation.landscapeLeft.pwCaptureVideoOrientation, .landscapeRight)
-        XCTAssertEqual(UIDeviceOrientation.landscapeRight.pwCaptureVideoOrientation, .landscapeLeft)
-        XCTAssertEqual(UIDeviceOrientation.portrait.pwCaptureVideoOrientation, .portrait)
-        XCTAssertEqual(UIDeviceOrientation.portraitUpsideDown.pwCaptureVideoOrientation, .portraitUpsideDown)
+        XCTAssertEqual(UIDeviceOrientation.landscapeLeft.pwCaptureRotationAngle, 0)
+        XCTAssertEqual(UIDeviceOrientation.landscapeRight.pwCaptureRotationAngle, 180)
+        XCTAssertEqual(UIDeviceOrientation.portrait.pwCaptureRotationAngle, 90)
+        XCTAssertEqual(UIDeviceOrientation.portraitUpsideDown.pwCaptureRotationAngle, 270)
     }
 
     func testCaptureOrientationDefaultsToPortrait() {
         // Ambiguous physical orientations should not tilt the capture.
-        XCTAssertEqual(UIDeviceOrientation.faceUp.pwCaptureVideoOrientation, .portrait)
-        XCTAssertEqual(UIDeviceOrientation.faceDown.pwCaptureVideoOrientation, .portrait)
-        XCTAssertEqual(UIDeviceOrientation.unknown.pwCaptureVideoOrientation, .portrait)
+        XCTAssertEqual(UIDeviceOrientation.faceUp.pwCaptureRotationAngle, 90)
+        XCTAssertEqual(UIDeviceOrientation.faceDown.pwCaptureRotationAngle, 90)
+        XCTAssertEqual(UIDeviceOrientation.unknown.pwCaptureRotationAngle, 90)
     }
 }
