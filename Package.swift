@@ -52,6 +52,16 @@ let package = Package(
         // which points nowhere near the actual cause. Constraining to 2.14.x
         // forces every resolution context to agree.
         .package(url: "https://github.com/nathantannar4/Transmission", .upToNextMinor(from: "2.16.0")),
+
+        // PurpleWaveKit carries the shared PurpleWave vocabulary — media types,
+        // categories, location — so this package stops redefining it.
+        //
+        // Pinned to a branch because PurpleWaveKit has no tags yet. That makes
+        // builds of a given Camera commit non-reproducible: two resolves can
+        // pick different Kit revisions. Move this to a version as soon as Kit
+        // cuts a release — a tagged Camera release should not depend on a
+        // moving branch.
+        .package(url: "https://github.com/PurpleWave/PurpleWaveKit-iOS", branch: "main"),
     ],
     targets: [
         // Session lifecycle, device selection and controls, orientation,
@@ -59,6 +69,9 @@ let package = Package(
         // views both screens share. Knows nothing about the microphone.
         .target(
             name: "PurpleWaveCameraCore",
+            dependencies: [
+                .product(name: "PurpleWaveKit", package: "PurpleWaveKit-iOS")
+            ],
             path: "Sources/PurpleWaveCameraCore"
         ),
 
