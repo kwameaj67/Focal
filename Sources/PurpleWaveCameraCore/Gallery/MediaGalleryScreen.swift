@@ -6,6 +6,7 @@
 
 import Photos
 import SwiftUI
+import PurpleWaveKit
 
 package struct MediaGalleryScreen: View {
 
@@ -19,7 +20,7 @@ package struct MediaGalleryScreen: View {
     @State private var permissionDenied = false
 
     package init(
-        mediaType: GalleryMediaType,
+        mediaType: MediaType,
         onDone: @escaping ([PHAsset]) -> Void,
         onCancel: @escaping () -> Void
     ) {

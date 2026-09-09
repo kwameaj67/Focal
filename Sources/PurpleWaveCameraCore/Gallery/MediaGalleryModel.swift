@@ -4,20 +4,26 @@
 //
 
 import Photos
+import PurpleWaveKit
 import SwiftUI
 
-package enum GalleryMediaType {
-    case image
-    case video
+/// Photos-framework bridging for PurpleWaveKit's shared `MediaType`.
+///
+/// The type itself lives in PurpleWaveKit so the whole PurpleWave codebase
+/// agrees on what a media type is; these two members stay here because Kit
+/// doesn't import Photos and shouldn't have to. `prettyPrint` on Kit's enum is
+/// the singular machine-ish form ("image"); `pluralNoun` is the human phrasing
+/// this UI needs ("photos"), so they're separate rather than one doing both.
+package extension MediaType {
 
-    package var phMediaType: PHAssetMediaType {
+    var phMediaType: PHAssetMediaType {
         switch self {
         case .image: return .image
         case .video: return .video
         }
     }
 
-    package var pluralNoun: String {
+    var pluralNoun: String {
         switch self {
         case .image: return "photos"
         case .video: return "videos"
@@ -38,7 +44,7 @@ package final class MediaGalleryModel: ObservableObject {
     @Published package private(set) var sections: [GallerySection] = []
     @Published package var selected: [PHAsset] = []
 
-    package let mediaType: GalleryMediaType
+    package let mediaType: MediaType
 
     private static let headerFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -47,7 +53,7 @@ package final class MediaGalleryModel: ObservableObject {
         return f
     }()
 
-    package init(mediaType: GalleryMediaType) {
+    package init(mediaType: MediaType) {
         self.mediaType = mediaType
     }
 
