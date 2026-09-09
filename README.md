@@ -48,17 +48,25 @@ add it to a `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/<your-org>/purplewave-camera-ios.git", from: "1.0.0")
+    .package(url: "https://github.com/PurpleWave/PurpleWaveCamera-iOS.git", from: "0.1.0")
 ],
 targets: [
     .target(name: "YourApp", dependencies: [
-        .product(name: "PurpleWaveCamera", package: "purplewave-camera-ios")
+        .product(name: "PurpleWaveCamera", package: "PurpleWaveCamera-iOS")
     ])
 ]
 ```
 
-For local development you can also drag the `purplewave-camera-ios` folder in as a local
-package.
+Depend on `PurpleWaveCameraPhoto` instead of the umbrella if you only capture
+stills — it links no microphone code, so the host needs no
+`NSMicrophoneUsageDescription`.
+
+While the package is on `0.x`, `from:` resolves within a single minor version:
+`from: "0.1.0"` means `>=0.1.0, <0.2.0`. Every `0.y` bump may break API, which
+is deliberate while the surface is still moving.
+
+For local development you can also drag the `PurpleWaveCamera` folder in as a
+local package.
 
 ---
 
