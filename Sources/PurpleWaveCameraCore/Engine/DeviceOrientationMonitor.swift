@@ -92,15 +92,35 @@ package extension UIDeviceOrientation {
         self == .landscapeLeft || self == .landscapeRight
     }
 
-    /// Maps the device orientation to the correct capture orientation. Note the
-    /// left/right swap — a device held `.landscapeLeft` needs a
-    /// `.landscapeRight` capture connection so the recorded frame is upright.
-    var pwCaptureVideoOrientation: AVCaptureVideoOrientation {
+    /// Capture rotation for this device orientation, in degrees, for
+    /// `AVCaptureConnection.videoRotationAngle`.
+    ///
+    /// Replaces the deprecated `AVCaptureVideoOrientation` bridge. The angles
+    /// correspond to the old cases exactly — `landscapeRight` is 0°, `portrait`
+    /// 90°, `landscapeLeft` 180°, `portraitUpsideDown` 270° — so behaviour is
+    /// unchanged, including the left/right swap: a device held `.landscapeLeft`
+    /// needs the `.landscapeRight` capture rotation for the frame to come out
+    /// upright.
+    var pwCaptureRotationAngle: CGFloat {
         switch self {
-        case .portraitUpsideDown: return .portraitUpsideDown
-        case .landscapeLeft:      return .landscapeRight
-        case .landscapeRight:     return .landscapeLeft
-        default:                  return .portrait
+        case .portraitUpsideDown: return 270   // was .portraitUpsideDown
+        case .landscapeLeft:      return 0     // was .landscapeRight
+        case .landscapeRight:     return 180   // was .landscapeLeft
+        default:                  return 90    // was .portrait
         }
+    }
+}
+
+package extension AVCaptureConnection {
+
+    /// Sets `videoRotationAngle`, ignoring angles the connection doesn't
+    /// support.
+    ///
+    /// Unlike the old `videoOrientation`, this property has a support query and
+    /// assigning an unsupported value is an error rather than a no-op, so the
+    /// check isn't optional.
+    func pwSetRotationAngle(_ angle: CGFloat) {
+        guard isVideoRotationAngleSupported(angle) else { return }
+        videoRotationAngle = angle
     }
 }
