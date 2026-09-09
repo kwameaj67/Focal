@@ -51,7 +51,7 @@ let package = Package(
         // reference and reports "Missing package product 'PurpleWaveCamera'",
         // which points nowhere near the actual cause. Constraining to 2.14.x
         // forces every resolution context to agree.
-        .package(url: "https://github.com/nathantannar4/Transmission", .upToNextMinor(from: "2.14.4")),
+        .package(url: "https://github.com/nathantannar4/Transmission", .upToNextMinor(from: "2.16.0")),
     ],
     targets: [
         // Session lifecycle, device selection and controls, orientation,

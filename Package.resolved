@@ -23,8 +23,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/nathantannar4/Transmission",
       "state" : {
-        "revision" : "5838e9a7418d7300d2dbb66c108352df6a75bec1",
-        "version" : "2.14.4"
+        "revision" : "fbe8e5f857cec6bb06c99b3a6de9ac0ad6e7217a",
+        "version" : "2.16.0"
       }
     }
   ],
