@@ -204,8 +204,8 @@ final class VideoRecordEngine: NSObject, ObservableObject {
 
         controller.sessionQueue.async { [weak self] in
             guard let self else { return }
-            self.movieOutput.connection(with: .video)?.videoOrientation =
-                orientation.pwCaptureVideoOrientation
+            self.movieOutput.connection(with: .video)?
+                .pwSetRotationAngle(orientation.pwCaptureRotationAngle)
             self.movieOutput.startRecording(to: url, recordingDelegate: self)
             Task { @MainActor in self.controller.setTorch(self.isTorchOn) }
         }
