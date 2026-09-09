@@ -116,8 +116,9 @@ final class PhotoCaptureEngine: NSObject, ObservableObject {
             photoOutput.maxPhotoDimensions = maxDimensions
         }
 
-        // Keep the preview upright; capture orientation is set per-shot.
-        photoOutput.connection(with: .video)?.videoOrientation = .portrait
+        // Keep the preview upright; capture rotation is set per-shot. 90° is
+        // the portrait equivalent of the old `.portrait` orientation.
+        photoOutput.connection(with: .video)?.pwSetRotationAngle(90)
     }
 
     // MARK: - Capabilities
@@ -183,7 +184,7 @@ final class PhotoCaptureEngine: NSObject, ObservableObject {
 
         // Snapshot the main-actor state we need before hopping to the session
         // queue, so the queue closure touches only non-isolated objects.
-        let captureOrientation = orientation.pwCaptureVideoOrientation
+        let captureAngle = orientation.pwCaptureRotationAngle
         let flash = flashMode.avFlashMode
 
         return try await withCheckedThrowingContinuation { cont in
@@ -204,7 +205,7 @@ final class PhotoCaptureEngine: NSObject, ObservableObject {
                 // Match capture orientation to how the device is held. Setting
                 // the connection and capturing are both safe off the main thread.
                 connection.preferredVideoStabilizationMode = .off
-                connection.videoOrientation = captureOrientation
+                connection.pwSetRotationAngle(captureAngle)
                 self.photoOutput.capturePhoto(with: self.makeSettings(flash: flash), delegate: self)
             }
         }
