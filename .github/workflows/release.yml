@@ -1,0 +1,108 @@
+name: Release
+
+on:
+  push:
+    # Matches semver tags with or without a leading "v" — 0.1.0 and v0.1.0 both
+    # work, so a tag can't silently fail to trigger a release. The repo
+    # convention is unprefixed; SwiftPM accepts either.
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+-*"
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
+
+# The release step creates a GitHub Release, which needs write access to repo
+# contents. Nothing else here does.
+permissions:
+  contents: write
+
+# A tag is immutable once consumers resolve it, so never run two releases for
+# the same tag concurrently, and never cancel one halfway — a partial release
+# is worse than a slow one.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Tests run against the tagged commit specifically, not main. A tag can point
+  # anywhere, and once published it cannot be recalled — consumers may have
+  # resolved it before you notice. Verifying here is the last chance to catch a
+  # broken release.
+  verify:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      # Same scheme and destination as test.yml. PurpleWaveCamera-Package is the
+      # only scheme with a test action once the package has multiple products.
+      - name: Run tests
+        run: |
+          xcodebuild test \
+            -scheme PurpleWaveCamera-Package \
+            -destination "platform=iOS Simulator,name=iPhone 16" \
+            -resultBundlePath ./TestResults.xcresult
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-test-results
+          path: TestResults.xcresult
+
+      # A tagged commit whose manifest doesn't evaluate is the worst kind of
+      # broken release: resolution fails for consumers with an error that points
+      # at their project rather than at this package. Cheap to check, so check.
+      - name: Verify manifest evaluates
+        run: swift package dump-package > /dev/null
+
+  release:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so the changelog can diff against the previous tag.
+          fetch-depth: 0
+
+      - name: Build release notes
+        id: notes
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          PREV=$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || true)
+
+          {
+            echo "## Installation"
+            echo
+            echo '```swift'
+            echo ".package(url: \"${{ github.server_url }}/${{ github.repository }}.git\", from: \"${TAG#v}\")"
+            echo '```'
+            echo
+            echo "## Changes"
+            echo
+            if [ -n "$PREV" ]; then
+              git log --no-merges --pretty='- %s' "${PREV}..${TAG}"
+            else
+              echo "First release."
+            fi
+          } > NOTES.md
+
+          echo "previous=${PREV:-none}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # `gh` is preinstalled on GitHub runners, so this avoids taking a
+          # third-party action as a dependency of the release path itself.
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes-file NOTES.md \
+            --verify-tag

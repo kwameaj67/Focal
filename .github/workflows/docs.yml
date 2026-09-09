@@ -1,0 +1,123 @@
+name: Deploy DocC to GitHub Pages
+
+on:
+  # Runs after the "Run Tests" workflow finishes on main, rather than on push
+  # directly — the job below still gates on that run having passed, so a failed
+  # test run never reaches the build step.
+  workflow_run:
+    workflows: ["Run Tests"]
+    types: [completed]
+    branches: ["main"]
+  workflow_dispatch:
+
+# Only one Pages deployment at a time; let an in-flight run finish rather than
+# canceling it, since a canceled deploy can leave Pages serving a partial site.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # workflow_run doesn't automatically check out the commit it ran for —
+          # without this, this would build whatever main's HEAD happens to be by
+          # the time this job runs, not necessarily the tested commit.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      # PurpleWaveCamera targets iOS only (it imports UIKit), so documentation has to
+      # be built against the iOS Simulator SDK via xcodebuild — `swift package
+      # generate-documentation` builds for macOS by default and fails outright, since
+      # this package can't compile there.
+      #
+      # The -Package scheme builds every target, so this produces one .doccarchive
+      # per module rather than the single archive a one-target package would give.
+      - name: Build documentation archives
+        run: |
+          xcodebuild docbuild \
+            -scheme PurpleWaveCamera-Package \
+            -destination "generic/platform=iOS Simulator" \
+            -derivedDataPath ./.derivedData-docc
+
+      - name: Transform for static hosting
+        run: |
+          set -euo pipefail
+
+          # Three documented modules: Core, Photo, Video. The PurpleWaveCamera
+          # umbrella target is deliberately excluded — it contains nothing but
+          # `@_exported import` lines, so its archive has no symbols of its own
+          # and would render as an empty module page next to the real three.
+          ARCHIVES=()
+          for module in PurpleWaveCameraCore PurpleWaveCameraPhoto PurpleWaveCameraVideo; do
+            found=$(find ./.derivedData-docc -name "${module}.doccarchive" -maxdepth 6 | head -n 1)
+            if [ -z "$found" ]; then
+              echo "error: no .doccarchive produced for ${module}" >&2
+              exit 1
+            fi
+            ARCHIVES+=("$found")
+          done
+
+          # A multi-module package can't be transformed archive-by-archive into
+          # one site: each transform writes its own top-level css/js/data
+          # directories, so the later ones clobber the earlier ones. `docc merge`
+          # combines them into a single archive with a landing page listing all
+          # three, which then transforms cleanly.
+          xcrun docc merge "${ARCHIVES[@]}" \
+            --synthesized-landing-page-name "PurpleWaveCamera" \
+            --output-path ./merged.doccarchive
+
+          # No --hosting-base-path: this site is private (restricted to users with
+          # repo access), which GitHub Pages serves from a dedicated, randomly-named
+          # pages.github.io subdomain rather than <org>.github.io/<repo>/. That
+          # subdomain serves from its own root, so a repo-name subpath baked into
+          # asset links here would 404 instead of resolving. If this site is ever
+          # switched to public visibility, re-add `--hosting-base-path <repo-name>`
+          # to match the <org>.github.io/<repo>/ path it would be served at.
+          xcrun docc process-archive transform-for-static-hosting \
+            ./merged.doccarchive \
+            --output-path ./docs-build
+
+          # The transformed archive's top-level index.html doesn't map to any
+          # specific documentation page, so visiting it directly shows an empty
+          # shell. Redirect into the merged landing page, which lists the three
+          # modules. (For a single-module package this would point at
+          # ./documentation/<module>/ instead.)
+          cat > ./docs-build/index.html <<HTML
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta http-equiv="refresh" content="0; url=./documentation/">
+            </head>
+            <body></body>
+          </html>
+          HTML
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs-build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
