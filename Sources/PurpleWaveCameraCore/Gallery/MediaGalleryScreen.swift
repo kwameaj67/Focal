@@ -17,7 +17,20 @@ package struct MediaGalleryScreen: View {
     /// Called when the user cancels.
     package let onCancel: () -> Void
 
-    @State private var permissionDenied = false
+    /// What the body should show. Kept as one value rather than a pair of
+    /// booleans so "still fetching" and "nothing to show" can never both be
+    /// true — the bug that made an empty grid look identical to a slow one.
+    private enum LoadState {
+        case loading
+        case denied
+        case loaded
+    }
+
+    @State private var state: LoadState = .loading
+
+    /// Whether access is limited to a user-picked subset. An empty grid means
+    /// something different then, and the user can do something about it.
+    @State private var isLimited = false
 
     package init(
         mediaType: MediaType,
@@ -37,9 +50,15 @@ package struct MediaGalleryScreen: View {
     package var body: some View {
         NavigationStack {
             Group {
-                if permissionDenied {
+                switch state {
+                case .loading:
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                case .denied:
                     deniedState
-                } else {
+                case .loaded where model.isEmpty:
+                    emptyState
+                case .loaded:
                     grid
                 }
             }
@@ -99,6 +118,43 @@ package struct MediaGalleryScreen: View {
         }
     }
 
+    /// Shown when the library holds nothing of this media type.
+    ///
+    /// Worth distinguishing from the denied state: access was granted and the
+    /// fetch succeeded, there is simply nothing to pick. Without this the grid
+    /// rendered as a blank sheet, which reads as a broken screen rather than an
+    /// empty one.
+    private var emptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: model.mediaType == .video
+                  ? "video.slash"
+                  : "photo.on.rectangle.angled")
+                .font(.largeTitle)
+                .foregroundColor(.secondary)
+
+            Text("No \(model.mediaType.pluralNoun)")
+                .font(.headline)
+
+            if isLimited {
+                // Not actually an empty library — the user shared a subset that
+                // happens to contain none of this type. Telling them "no photos"
+                // and nothing else would be misleading.
+                Text("You've allowed access to selected \(model.mediaType.pluralNoun) only, "
+                     + "and none are shared with this app yet.")
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(.secondary)
+
+                Button("Manage Access") { MediaPermissions.openSettings() }
+            } else {
+                Text("Your library has no \(model.mediaType.pluralNoun) to import.")
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     private var deniedState: some View {
         VStack(spacing: 12) {
             Image(systemName: "photo.on.rectangle.angled")
@@ -115,12 +171,18 @@ package struct MediaGalleryScreen: View {
     // MARK: - Loading
 
     private func requestAndLoad() async {
-        let granted = await MediaPermissions.requestPhotoLibrary()
-        if granted {
-            model.load()
-        } else {
-            permissionDenied = true
+        // `.task` re-runs on every appearance; a completed load stays put rather
+        // than dropping back to a spinner.
+        guard state != .loaded else { return }
+
+        guard await MediaPermissions.requestPhotoLibrary() else {
+            state = .denied
+            return
         }
+
+        isLimited = MediaPermissions.photoLibraryStatus() == .limited
+        model.load()
+        state = .loaded
     }
 }
 
