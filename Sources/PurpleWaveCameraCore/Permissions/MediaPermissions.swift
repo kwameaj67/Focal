@@ -84,15 +84,29 @@ public enum MediaPermissions {
 
     // MARK: Convenience
 
-    /// Ensures every permission required by a *photo* flow is granted.
-    /// - Parameter needsLibrary: pass the value of `config.allowsGallery ||
-    ///   config.savesToPhotoLibrary`.
-    /// - Returns: `nil` on success, or the first denied permission.
-    public static func ensurePhotoPermissions(
-        needsLibrary: Bool
-    ) async -> PWPermission? {
+    /// Requests add-only photo-library access, for saving captures.
+    ///
+    /// Separate from `requestPhotoLibrary()` because the two are genuinely
+    /// different asks: reading the library to import needs `.readWrite`, while
+    /// writing a capture into an album needs only `.addOnly` — a much smaller
+    /// permission that iOS presents differently and that many users will grant
+    /// when they would refuse full access.
+    @discardableResult
+    public static func requestPhotoLibraryAdd() async -> Bool {
+        await requestPhotoLibrary(for: .addOnly)
+    }
+
+    /// Ensures the permissions a photo capture screen cannot start without.
+    ///
+    /// Camera only. Photo-library access is deliberately not requested here:
+    /// reading the library is asked for when the gallery is opened, and adding
+    /// to it when a capture is actually saved. Bundling them meant declining
+    /// the library took down the whole capture screen, even though the camera
+    /// worked fine.
+    ///
+    /// - Returns: `nil` on success, or the denied permission.
+    public static func ensurePhotoPermissions() async -> PWPermission? {
         if !(await requestCamera()) { return .camera }
-        if needsLibrary, !(await requestPhotoLibrary()) { return .photoLibrary }
         return nil
     }
 
