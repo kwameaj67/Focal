@@ -5,12 +5,28 @@ recorder** for iOS. Built SwiftUI-first, with AVFoundation doing the capture
 work. Extracted and generalized from FieldTool's enhanced camera and video
 recorder so it can be dropped into any app with no FieldTool dependencies.
 
-- **iOS 16+**, Swift 5.9.
+- **iOS 17+**, Swift 5.9.
 - **Callback / delegate based** — the SDK captures media and hands it back; your
-  app decides how to store or upload it.
-- **One dependency**: [Transmission](https://github.com/nathantannar4/Transmission)
-  (`2.14.4+`), used for the zoom transition on the full-screen photo preview.
-  SwiftPM resolves it automatically.
+  app decides how to store or upload it. **Nothing is written to disk for you**:
+  photos are handed over as bytes, and recordings as a file you take ownership
+  of.
+- **Two dependencies**, both resolved by SwiftPM:
+  [Transmission](https://github.com/nathantannar4/Transmission) (`2.16.x`) for
+  the zoom transition on the full-screen photo preview, and
+  [PurpleWaveKit](https://github.com/PurpleWave/PurpleWaveKit-iOS) for the
+  shared PurpleWave vocabulary.
+
+---
+
+## Screenshots
+
+| Photo capture | Info tip | Settings | Aspect ratio | Video recorder |
+| :---: | :---: | :---: | :---: | :---: |
+| <img src="Docs/Screenshots/photo-screen.png" width="150"> | <img src="Docs/Screenshots/photo-info-tip.png" width="150"> | <img src="Docs/Screenshots/capture-settings.png" width="150"> | <img src="Docs/Screenshots/aspect-ratio.png" width="150"> | <img src="Docs/Screenshots/video-screen.png" width="150"> |
+
+> Taken in the Simulator, which has no camera, so the viewfinder is black.
+> Everything else is what the SDK draws. The video screen is shown in portrait,
+> where it blocks recording and asks the user to rotate.
 
 ---
 
@@ -26,10 +42,16 @@ Both screens share the same capture feature set:
 | Flash (photo) / Torch (video) | ✅ | ✅ |
 | Ultra-wide ↔ wide lens switch | ✅ | ✅ |
 | Custom multi-select gallery import | ✅ | ✅ |
+| Batch callback for a whole import | ✅ | ✅ |
 | Consumer-defined category selector | ✅ (scroll) | ✅ (segmented) |
 | Optional save-to-photo-library | ✅ | ✅ |
 | Multi-capture (screen stays open) | ✅ | ✅ |
 | Capture "drop into thumbnail" animation | ✅ | ✅ |
+| Settings sheet (flash/torch, aspect, timer, exposure, lens) | ✅ | ✅ |
+| Aspect ratio — 4:3, 16:9, 1:1 | ✅ | ✅ |
+| Self-timer — off, 3s, 5s, 10s | ✅ | ✅ |
+| Manual exposure bias (device-reported range) | ✅ | ✅ |
+| Optional capture location | ✅ | ✅ |
 | Tap thumbnail → full-screen preview (zoom) | ✅ image | ✅ plays video |
 | Landscape-locked recording | — | ✅ |
 | Recording timer w/ optional auto-stop | — | ✅ |
@@ -82,6 +104,7 @@ SDK requests access:
 | `NSMicrophoneUsageDescription` | Video recording (audio) |
 | `NSPhotoLibraryUsageDescription` | Gallery import |
 | `NSPhotoLibraryAddUsageDescription` | `savesToPhotoLibrary = true` |
+| `NSLocationWhenInUseUsageDescription` | `capturesLocation = true` |
 
 Example:
 
@@ -96,8 +119,12 @@ Example:
 <string>Used to save captured media to your photo library.</string>
 ```
 
-The SDK requests the permissions it needs on launch and shows a
-"Open Settings" screen if one was denied.
+Permissions are requested at the moment they are needed, not all at once on
+launch: the camera when a screen opens, the library when the user taps the
+gallery button, add-only access when a capture is actually saved, and location
+only if you set `capturesLocation`. Declining the library therefore leaves the
+camera working. Only a denied **camera** blocks the screen, which shows an
+"Open Settings" prompt.
 
 ---
 
@@ -129,6 +156,10 @@ struct CaptureExample: View {
                         onCapture: { result in
                             // result.imageData, result.image, result.category …
                             print("Captured a \(result.category?.title ?? "photo")")
+                        },
+                        onImport: { results in
+                            // Fires once per gallery selection, with the whole set.
+                            print("Imported \(results.count) photos")
                         },
                         onFinish: { _ in showCamera = false }
                     )
@@ -183,6 +214,9 @@ PWVideoScreen(
         onRecord: { result in
             // result.fileURL is a local .mov you now own — move or upload it
         },
+        onImport: { results in
+            // Fires once per gallery selection, with the whole set.
+        },
         onFinish: { _ in /* dismiss */ }
     )
 )
@@ -205,8 +239,9 @@ UIKit: `PWCamera.makeVideoRecorder(config:handlers:)` /
 | `allowsGallery` | `true` | Show the library-import button. |
 | `allowsUltraWide` | `true` | Show the ultra-wide toggle (device permitting). |
 | `savesToPhotoLibrary` | `false` | Also save captures to the `FTCamera` album (name kept for continuity). |
-| `overlayLabel` | `nil` | Top-right badge text (e.g. an item ID). |
-| `outputDirectory` | `nil` | Where file helpers write; temp dir if `nil`. |
+| `capturesLocation` | `false` | Attach a location fix to each result. Needs `NSLocationWhenInUseUsageDescription`. |
+| `overlayLabel` | `nil` | Badge text shown in the info tip (e.g. an item ID). |
+| `outputDirectory` | `nil` | Unused by the photo screen — it writes no files. Present for symmetry with the video config. |
 
 ### `PWVideoConfig` (video)
 
@@ -221,32 +256,106 @@ UIKit: `PWCamera.makeVideoRecorder(config:handlers:)` /
 | `allowsUltraWide` | `true` | Show the ultra-wide toggle. |
 | `allowsGallery` | `true` | Show the library-import button. |
 | `savesToPhotoLibrary` | `false` | Also save recordings to the `FTCamera` album (name kept for continuity). |
+| `capturesLocation` | `false` | Attach a location fix to each result. Needs `NSLocationWhenInUseUsageDescription`. |
 | `maxFileSizeMB` | `400` | Reject imported videos larger than this. |
-| `overlayLabel` | `nil` | Top-right badge text. |
+| `overlayLabel` | `nil` | Badge text shown in the info tip. |
 | `outputDirectory` | `nil` | Where recordings are written; temp dir if `nil`. |
 
 ---
 
 ## Results
 
-`onCapture` / `onRecord` fire **once per item** (the screen stays open for
-multi-capture). `onFinish` fires when the user leaves via Done or Cancel.
+### Callbacks
+
+| Closure | Delegate method | When it fires |
+| --- | --- | --- |
+| `onCapture` | `photoCapture(didCapture:)` | Once per photo, captured or imported. |
+| `onRecord` | `videoRecorder(didRecord:)` | Once per video, recorded or imported. |
+| `onImport` | `photoCapture(didImport:)` / `videoRecorder(didImport:)` | Once per gallery selection, with the whole set. |
+| `onFinish` | `…(didFinish:)` | The user left via Done or Cancel. |
+| `onError` | `…(didFail:)` | A recoverable failure — one bad capture or one unreadable asset. |
+
+Every callback except `onCapture` / `onRecord` is optional: the handler structs
+default them to no-ops, and the delegate protocols supply default
+implementations.
+
+### `didImport` / `onImport`
+
+The per-item callback fires as each asset lands, so a host that wants to stream
+uploads needs nothing else. `didImport` is **in addition** to that, for hosts
+that want to act on the selection as a set — uploading a batch together, or
+showing one "12 photos added" confirmation instead of twelve.
+
+```swift
+PWPhotoHandlers(
+    onCapture: { result in
+        // Fires 12 times for a 12-photo selection, one at a time.
+        stage(result)
+    },
+    onImport: { results in
+        // Then once more, with all 12.
+        upload(batch: results)
+    }
+)
+```
+
+```swift
+extension MyViewController: PWPhotoCaptureDelegate {
+    func photoCapture(didCapture result: PWPhotoResult) { stage(result) }
+    func photoCapture(didImport results: [PWPhotoResult]) { upload(batch: results) }
+}
+```
+
+Two things to know:
+
+- **Only successful imports appear.** An asset that fails to load is reported
+  through `onError` and left out, so `results.count` can be smaller than the
+  number of assets the user picked. Count it if that matters to you.
+- **It does not fire for live captures**, and it does not fire at all when a
+  selection produced nothing.
 
 ### `PWPhotoResult`
 - `imageData: Data` — encoded (HEVC/JPEG) bytes.
-- `image: UIImage` — decoded image.
+- `image: UIImage` — decoded from `imageData` on first access, then held. See
+  [Memory](#memory) below.
 - `category: PWCategory?` — selected category (if any).
 - `source: .camera | .gallery`
 - `orientation: UIDeviceOrientation` — device orientation at capture.
 - `metadata: [String: Any]?` — capture metadata when available.
+- `location: CLLocation?` — a fix when `capturesLocation` is on and one was
+  available. Always `nil` for gallery imports: where the phone is now says
+  nothing about where the asset was taken.
+- `capturedAt: Date` — for an import, the time of import rather than the
+  asset's original creation date.
 
 ### `PWVideoResult`
 - `fileURL: URL` — local `.mov` file; **ownership transfers to you** (move or
   delete it — the SDK writes to a temp directory by default).
 - `category: PWCategory?`
 - `duration: TimeInterval`
-- `thumbnail: UIImage?`
+- `thumbnail: UIImage?` — at most 400×400.
 - `source: .camera | .gallery`
+- `location: CLLocation?`
+- `capturedAt: Date`
+
+### Memory
+
+A decoded 12MP frame costs about **47 MB**; the same photo encoded is 1–2 MB.
+Holding decoded images is therefore the one thing that will reliably get a
+capture session killed by the system, so the SDK keeps as few resident as it
+can — never one per photo taken:
+
+- The on-screen pile and grid keep a small thumbnail and the encoded bytes. The
+  full-screen preview decodes the page you are looking at and its immediate
+  neighbours, and releases the rest as you swipe.
+- `PWPhotoResult.image` decodes on first access and caches from then on, so a
+  batch import hands you encoded bytes and nothing more until you ask for
+  pixels. Reading `image` repeatedly — inside a SwiftUI `body`, say — costs
+  nothing after the first read.
+
+The practical consequence for a host: if you are processing a large import,
+work through `imageData` and let each result go, rather than touching `image`
+on all of them and holding the array.
 
 ---
 
@@ -255,7 +364,7 @@ multi-capture). `onFinish` fires when the user leaves via Done or Cancel.
 If you'd rather gate access yourself before presenting a screen:
 
 ```swift
-let denied = await MediaPermissions.ensureVideoPermissions(needsLibrary: true)
+let denied = await MediaPermissions.ensureVideoPermissions()
 if denied == nil {
     // present PWVideoScreen
 } else {
@@ -263,8 +372,20 @@ if denied == nil {
 }
 ```
 
-Also available: `cameraStatus()`, `requestCamera()`, `requestMicrophone()`,
-`photoLibraryStatus()`, `requestPhotoLibrary()`, `ensurePhotoPermissions()`.
+`ensurePhotoPermissions()` covers the camera and `ensureVideoPermissions()` the
+camera and microphone. Neither asks for the photo library — that is requested
+when the user opens the gallery, and add-only access when a capture is saved,
+so declining the library no longer takes down a working camera.
+
+| Function | Target |
+| --- | --- |
+| `cameraStatus()` / `requestCamera()` | Camera |
+| `microphoneStatus()` / `requestMicrophone()` | Microphone (`PurpleWaveCameraVideo` only) |
+| `photoLibraryStatus()` / `requestPhotoLibrary()` | Library read |
+| `requestPhotoLibraryAdd()` | Library add-only |
+| `ensurePhotoPermissions()` | Camera |
+| `ensureVideoPermissions()` | Camera + microphone |
+| `openSettings()` | Opens the host app's Settings page |
 
 ---
 
@@ -315,8 +436,8 @@ crashes the app, so this is a correctness boundary, not just tidiness.)
 Splitting did not widen the public API. Types that cross a target boundary but
 aren't meant for hosts — `CameraSessionController`, the shared views, the
 gallery — use Swift 5.9's `package` access level, so they're visible inside the
-package and invisible outside it. The public surface is the same 20 types it was
-before the split.
+package and invisible outside it. The split itself added nothing to the public
+surface; everything public since then came from a feature, not the refactor.
 
 Design notes:
 
