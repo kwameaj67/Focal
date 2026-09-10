@@ -622,17 +622,23 @@ public struct PWCameraScreen: View {
         Task {
             // Collected so the batch callback can report the whole selection
             // once, alongside the per-item callbacks that fire as each lands.
+            //
+            // These results decode lazily, so the array costs roughly the
+            // encoded size of the selection rather than one full bitmap per
+            // photo — the difference between ~120 MB and ~2 GB for forty.
             var imported: [PWPhotoResult] = []
 
             for asset in assets {
-                guard let image = await MediaImporter.importImage(asset) else {
+                // The decoded image is scoped to this iteration on purpose: it
+                // is only here to derive a thumbnail, and holding one per asset
+                // is exactly what used to exhaust memory on a large selection.
+                guard let item = await MediaImporter.importImage(asset) else {
                     // An asset that can't be imported is reported rather than
                     // silently dropped — otherwise a host that picked ten and
                     // received eight has no way to know why.
                     handlers.onError(.photoCaptureFailed("Could not import a selected photo"))
                     continue
                 }
-                let item = image
                 didCaptureAny = true
                 captured.append(CapturedPhotoItem(data: item.data,
                                                   image: item.image,
@@ -644,7 +650,6 @@ public struct PWCameraScreen: View {
 
                 let result = PWPhotoResult(
                     imageData: item.data,
-                    image: item.image,
                     category: selectedCategory,
                     source: .gallery,
                     orientation: orientation.orientation,
