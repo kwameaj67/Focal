@@ -17,8 +17,12 @@ struct RotateToLandscapeOverlay: View {
     var onHelpTapped: (() -> Void)?
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.6).ignoresSafeArea()
+        // No full-bleed scrim and no hit testing: this is a notice, not a modal.
+        // The dimming layer used to swallow every tap, so torch, gallery,
+        // settings and the category bar were all unreachable while in portrait —
+        // including the controls a user might want to set up *before* rotating.
+        VStack {
+            Spacer()
 
             VStack(spacing: 12) {
                 Text("Please rotate your device to landscape to continue. "
@@ -38,9 +42,12 @@ struct RotateToLandscapeOverlay: View {
             .padding(20)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.black)
+                    .fill(Color.black.opacity(0.85))
             )
             .padding(.horizontal, 32)
+
+            Spacer()
         }
+        .allowsHitTesting(false)
     }
 }
