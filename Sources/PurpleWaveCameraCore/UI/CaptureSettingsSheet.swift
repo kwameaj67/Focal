@@ -143,19 +143,56 @@ package struct CaptureSettingsGrid: View {
         self.onSelect = onSelect
     }
 
-    /// Three per row. Fixed rather than adaptive so the row count is
-    /// predictable — the sheet's detent has to be sized for it, and an adaptive
-    /// grid that reflows on a narrower device would leave the sheet the wrong
-    /// height.
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
+    /// Three per row, laid out eagerly.
+    ///
+    /// This was a `LazyVGrid`, which caused a visible bug: lazy containers don't
+    /// create their children until they're needed, so the very first time the
+    /// panel opened the tiles were constructed *during* the slide-up animation
+    /// and popped in at full opacity while the panel was still moving. Every
+    /// subsequent open looked correct because the tiles already existed. With at
+    /// most a handful of tiles, laziness buys nothing and costs that.
+    private let perRow = 3
+
+    /// Tiles split into rows of `perRow`.
+    private var rows: [[CaptureSettingsTile]] {
+        stride(from: 0, to: tiles.count, by: perRow).map {
+            Array(tiles[$0 ..< min($0 + perRow, tiles.count)])
+        }
+    }
 
     package var body: some View {
-        LazyVGrid(columns: columns, spacing: 16) {
-            ForEach(tiles) { tile in
-                Button {
-                    HapticsManager.shared.selection()
-                    onSelect(tile.pane)
-                } label: {
+        VStack(spacing: 16) {
+            ForEach(rows.indices, id: \.self) { rowIndex in
+                HStack(spacing: 8) {
+                    ForEach(rows[rowIndex]) { tile in
+                        tileView(tile)
+                    }
+                    // Pad a short final row so its tiles keep the same column
+                    // width as a full row rather than spreading out.
+                    if rows[rowIndex].count < perRow {
+                        ForEach(0 ..< (perRow - rows[rowIndex].count), id: \.self) { _ in
+                            // Height-capped: Color is greedy in both axes, and
+                            // an unconstrained one stretched the row — and with
+                            // it the whole panel — to fill the screen.
+                            Color.clear
+                                .frame(maxWidth: .infinity, maxHeight: 1)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        // The root pane has no title bar, so without this the first row of
+        // tiles crowds the grabber.
+        .padding(.top, 14)
+        .padding(.bottom, 4)
+    }
+
+    private func tileView(_ tile: CaptureSettingsTile) -> some View {
+        Button {
+            HapticsManager.shared.selection()
+            onSelect(tile.pane)
+        } label: {
                     VStack(spacing: 8) {
                         ZStack {
                             Circle()
@@ -185,15 +222,8 @@ package struct CaptureSettingsGrid: View {
                     }
                     .frame(maxWidth: .infinity)
                     .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
         }
-        .padding(.horizontal, 16)
-        // The root pane has no title bar, so without this the first row of
-        // tiles crowds the grabber.
-        .padding(.top, 14)
-        .padding(.bottom, 4)
+        .buttonStyle(.plain)
     }
 }
 
@@ -298,6 +328,14 @@ private let previewTiles: [CaptureSettingsTile] = [
     .ignoresSafeArea()
 }
 
+/// Reports the settings panel's height so it can be parked exactly off-screen.
+package struct PanelHeightKey: PreferenceKey {
+    package static let defaultValue: CGFloat = 0
+    package static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
 // MARK: - Overlay container
 
 /// Bottom overlay that hosts the settings panes.
@@ -318,6 +356,11 @@ package struct CaptureSettingsOverlay<Content: View>: View {
     /// Live drag translation while the panel is being pulled down.
     @State private var dragOffset: CGFloat = 0
 
+    /// Measured panel height, used to park it fully off-screen when closed.
+    /// Seeded generously so the very first frame isn't visible on screen before
+    /// the real measurement arrives.
+    @State private var panelHeight: CGFloat = 400
+
     package init(isPresented: Binding<Bool>, @ViewBuilder content: () -> Content) {
         self._isPresented = isPresented
         self.content = content()
@@ -326,22 +369,69 @@ package struct CaptureSettingsOverlay<Content: View>: View {
     /// Shared curve for presentation, dismissal and height changes, so a pane
     /// swap that also resizes reads as one motion rather than two.
     package static var motion: Animation {
-        .spring(response: 0.34, dampingFraction: 0.86)
+        // Deliberately unhurried. The panel both moves and changes height when
+        // you step between panes, and at 0.34 those read as a snap rather than
+        // a morph — the eye can't follow what changed.
+        .spring(response: 0.5, dampingFraction: 0.9)
     }
 
     package var body: some View {
+        // The panel is always in the hierarchy and is *moved*, never inserted or
+        // removed.
+        //
+        // A `.transition` was the obvious approach and produced both bugs. On
+        // show, SwiftUI inserts the view already laid out and then animates it,
+        // so the content is fully drawn before the motion finishes. On dismiss,
+        // removal is driven by the transition rather than by a position we
+        // control, so a drag that was partway through fought the removal and the
+        // panel could vanish rather than travel. Driving `offset` directly means
+        // there is exactly one source of truth for where the panel is.
         ZStack(alignment: .bottom) {
             // Tap-outside target. Nearly transparent rather than a visible
-            // scrim: this sits over a live viewfinder, and dimming the frame
-            // the user is composing would be worse than leaving it clear.
+            // scrim: this sits over a live viewfinder, and dimming the frame the
+            // user is composing would be worse than leaving it clear.
             Color.black.opacity(0.001)
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
                 .onTapGesture { dismiss() }
+                .opacity(isPresented ? 1 : 0)
 
             panel
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(
+                            key: PanelHeightKey.self,
+                            value: geo.size.height
+                        )
+                    }
+                )
+                // Closed, the panel sits its own height below the screen plus
+                // slack for the safe-area extension, so it travels completely
+                // out of view rather than peeking.
+                //
+                // The single source of truth for its position: the drag offset
+                // while open, the parked position while closed. The panel used
+                // to carry its own `.offset(y: dragOffset)` as well, so two
+                // modifiers were competing to place it.
+                .offset(y: isPresented ? dragOffset : panelHeight + safeAreaSlack)
+                // Belt and braces. Offsetting past the screen edge should be
+                // enough, but a parent that doesn't clip will still draw it, and
+                // the panel's background deliberately ignores the bottom safe
+                // area — so hidden is asserted here rather than inferred from
+                // geometry.
+                .opacity(isPresented ? 1 : 0)
         }
+        .onPreferenceChange(PanelHeightKey.self) { measured in
+            guard measured > 0 else { return }
+            panelHeight = measured
+        }
+        // Nothing to hit when closed, so the viewfinder stays fully interactive.
+        .allowsHitTesting(isPresented)
     }
+
+    /// Extra travel beyond the panel's own height, covering the rounded corners
+    /// and the background's extension under the home indicator.
+    private let safeAreaSlack: CGFloat = 120
 
     private var panel: some View {
         VStack(spacing: 0) {
@@ -362,7 +452,6 @@ package struct CaptureSettingsOverlay<Content: View>: View {
                 // screen edge instead of floating above it.
                 .ignoresSafeArea(edges: .bottom)
         )
-        .offset(y: dragOffset)
         .gesture(dragToDismiss)
         .environment(\.colorScheme, .dark)
     }
