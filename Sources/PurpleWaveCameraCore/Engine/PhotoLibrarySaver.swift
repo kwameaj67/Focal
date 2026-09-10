@@ -43,6 +43,20 @@ package enum PhotoLibrarySaver {
         return status == .authorized || status == .limited
     }
 
+    /// Asks for add-only access if it hasn't been decided yet, then reports
+    /// whether saving is possible.
+    ///
+    /// Requested here rather than when the screen appears: a host that never
+    /// captures anything shouldn't be prompted, and a prompt at the moment of
+    /// saving is one the user can connect to something they just did.
+    package static func ensureAddPermission() async -> Bool {
+        if hasAddPermission { return true }
+        guard PHPhotoLibrary.authorizationStatus(for: .addOnly) == .notDetermined else {
+            return false
+        }
+        return await MediaPermissions.requestPhotoLibraryAdd()
+    }
+
     /// Ensures the album exists, then runs `body` to create an asset and add it.
     private static func performInAlbum(
         _ body: @escaping (_ albumRequest: PHAssetCollectionChangeRequest?,
