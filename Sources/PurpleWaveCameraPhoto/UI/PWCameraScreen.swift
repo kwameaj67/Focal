@@ -51,6 +51,9 @@ public struct PWCameraScreen: View {
     /// Non-nil while the self-timer is counting down; drives the big countdown
     /// digit and blocks a second shutter press.
     @State private var countdown: Int?
+    /// Whether the aspect/badge info tip is showing. Toggled by the info icon
+    /// in the top bar.
+    @State private var showInfoTip = false
 
     // MARK: Init
 
@@ -90,11 +93,8 @@ public struct PWCameraScreen: View {
         // Resume the session when the screen re-appears (e.g. after dismissing
         // the full-screen preview), which is what un-freezes the live feed.
         .overlay {
-            if showSettings {
-                CaptureSettingsOverlay(isPresented: $showSettings) {
-                    settingsSheet
-                }
-                .transition(.move(edge: .bottom))
+            CaptureSettingsOverlay(isPresented: $showSettings) {
+                settingsSheet
             }
         }
         .onAppear { if engine.isConfigured { engine.start(); orientation.start() } }
@@ -138,7 +138,7 @@ public struct PWCameraScreen: View {
         .overlay {
             if let countdown {
                 Text("\(countdown)")
-                    .font(.system(size: 96, weight: .thin, design: .rounded))
+                    .font(.system(size: 96, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
                     .shadow(radius: 12)
                     .transition(.scale.combined(with: .opacity))
@@ -152,7 +152,17 @@ public struct PWCameraScreen: View {
     private var overlays: some View {
         VStack(spacing: 0) {
             topBar
-            aspectAndBadge
+                // Anchored under the top bar's trailing edge so the caret lands
+                // on the info icon. `.topTrailing` keeps it there regardless of
+                // how wide the tip's content is.
+                .overlay(alignment: .topTrailing) {
+                    if showInfoTip {
+                        infoTip
+                            .padding(.top, 46)
+                            .padding(.trailing, 52)
+                    }
+                }
+                .zIndex(1)   // the tip must draw over the preview below it
             Spacer()
             ZoomBadge(text: engine.zoomText, rotation: orientation.angle)
             .padding(.bottom, 8)
@@ -180,30 +190,45 @@ public struct PWCameraScreen: View {
             if config.allowsGallery {
                 iconButton(systemName: "photo.fill") {
                     HapticsManager.shared.tap()
-                    showGallery = true
+                    openGallery()
                 }
             }
+            infoButton
             settingsButton
         }
         .padding(.horizontal, 15)
     }
 
-    private var aspectAndBadge: some View {
-        HStack {
-            Text(orientation.orientation.pwIsLandscape ? "4:3 Landscape" : "3:4 Portrait")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color.black.opacity(0.3))
-                .cornerRadius(5)
-            Spacer()
-            if let label = config.overlayLabel {
-                IcnBadge(icn: label)
+    /// Toggles the info tip. Filled while open so the icon reads as a state,
+    /// not just a button.
+    private var infoButton: some View {
+        iconButton(
+            systemName: showInfoTip ? "info.circle.fill" : "info.circle",
+            tint: showInfoTip ? .yellow : .white
+        ) {
+            HapticsManager.shared.tap()
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.8)) {
+                showInfoTip.toggle()
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 8)
+    }
+
+    /// Aspect framing and the item badge, shown on demand rather than parked
+    /// permanently over the viewfinder.
+    private var infoTip: some View {
+        InfoTip {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(orientation.orientation.pwIsLandscape ? "4:3 Landscape" : "3:4 Portrait")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+
+                if let label = config.overlayLabel {
+                    Text(label)
+                        .font(.system(size: 13))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+            }
+        }
     }
 
     private var bottomControls: some View {
@@ -245,7 +270,7 @@ public struct PWCameraScreen: View {
     }
 
     private var stackThumbnail: some View {
-        CapturedStackThumbnail(images: captured.map(\.image))
+        CapturedStackThumbnail(images: captured.map(\.thumbnail))
             .rotationEffect(.radians(orientation.angle))
             .thumbnailAnchor()
     }
@@ -255,8 +280,8 @@ public struct PWCameraScreen: View {
     private var settingsButton: some View {
         Button {
             HapticsManager.shared.tap()
-            settingsPane = .grid    
-            showSettings = true
+            settingsPane = .grid          // always reopen at the root
+            withAnimation(CaptureSettingsOverlay<EmptyView>.motion) { showSettings = true }
         } label: {
             Image(systemName: "gearshape.fill")
                 .font(.system(size: 20, weight: .medium))
@@ -438,6 +463,24 @@ public struct PWCameraScreen: View {
 
     // MARK: - Gallery
 
+    /// Requests photo-library access, then presents the picker only if it was
+    /// granted.
+    ///
+    /// Asked here rather than at screen setup so declining the library costs
+    /// the user the gallery button, not the camera. A denial is reported
+    /// through `onError` so the host knows why nothing opened, but the capture
+    /// screen stays usable.
+    private func openGallery() {
+        Task {
+            if await MediaPermissions.requestPhotoLibrary() {
+                showGallery = true
+            } else {
+                handlers.onError(.permissionDenied(.photoLibrary))
+            }
+        }
+    }
+
+
     private var galleryScreen: some View {
         MediaGalleryScreen(
             mediaType: .image,
@@ -474,8 +517,7 @@ public struct PWCameraScreen: View {
             await LocationManager.shared.requestAuthorization()
         }
 
-        let needsLibrary = config.allowsGallery || config.savesToPhotoLibrary
-        if let denied = await MediaPermissions.ensurePhotoPermissions(needsLibrary: needsLibrary) {
+        if let denied = await MediaPermissions.ensurePhotoPermissions() {
             deniedPermission = denied
             didSetUp = false   // allow a retry if the user grants access and returns
             handlers.onError(.permissionDenied(denied))
@@ -524,12 +566,17 @@ public struct PWCameraScreen: View {
                     ? (ImageCropper.encode(image) ?? photo.data)
                     : photo.data
 
-                let item = CapturedPhotoItem(image: image, category: selectedCategory)
-                let flying = image.preparingThumbnail(of: CGSize(width: 200, height: 200))
-                performDrop(flying: flying, commit: item)
+                let item = CapturedPhotoItem(data: data, image: image, category: selectedCategory)
+                performDrop(flying: item.thumbnail, commit: item)
 
+                // Fire and forget, so neither the save nor its permission
+                // prompt sits between the shutter and onCapture.
                 if config.savesToPhotoLibrary {
-                    PhotoLibrarySaver.save(imageData: data)
+                    Task {
+                        if await PhotoLibrarySaver.ensureAddPermission() {
+                            PhotoLibrarySaver.save(imageData: data)
+                        }
+                    }
                 }
 
                 let location = config.capturesLocation
@@ -555,8 +602,7 @@ public struct PWCameraScreen: View {
 
     /// Animates the `flying` thumbnail along the drop arc, then appends `commit`
     /// to the pile when it lands.
-    private func performDrop(flying: UIImage?, commit item: CapturedPhotoItem) {
-        guard let flying else { captured.append(item); HapticsManager.shared.success(); return }
+    private func performDrop(flying: UIImage, commit item: CapturedPhotoItem) {
         dropImage = flying
         dropProgress = 0
         // Linear timing preserves the arc/bounce curve baked into PWDropPath.
@@ -574,18 +620,31 @@ public struct PWCameraScreen: View {
 
     private func importImages(_ assets: [PHAsset]) {
         Task {
+            // Collected so the batch callback can report the whole selection
+            // once, alongside the per-item callbacks that fire as each lands.
+            var imported: [PWPhotoResult] = []
+
             for asset in assets {
-                guard let imported = await MediaImporter.importImage(asset) else { continue }
+                guard let image = await MediaImporter.importImage(asset) else {
+                    // An asset that can't be imported is reported rather than
+                    // silently dropped — otherwise a host that picked ten and
+                    // received eight has no way to know why.
+                    handlers.onError(.photoCaptureFailed("Could not import a selected photo"))
+                    continue
+                }
+                let item = image
                 didCaptureAny = true
-                captured.append(CapturedPhotoItem(image: imported.image, category: selectedCategory))
+                captured.append(CapturedPhotoItem(data: item.data,
+                                                  image: item.image,
+                                                  category: selectedCategory))
 
                 if config.savesToPhotoLibrary {
-                    PhotoLibrarySaver.save(imageData: imported.data)
+                    PhotoLibrarySaver.save(imageData: item.data)
                 }
 
-                handlers.onCapture(PWPhotoResult(
-                    imageData: imported.data,
-                    image: imported.image,
+                let result = PWPhotoResult(
+                    imageData: item.data,
+                    image: item.image,
                     category: selectedCategory,
                     source: .gallery,
                     orientation: orientation.orientation,
@@ -595,8 +654,14 @@ public struct PWCameraScreen: View {
                     // claiming otherwise would be worse than leaving it nil.
                     location: nil,
                     capturedAt: Date()
-                ))
+                )
+                imported.append(result)
+                handlers.onCapture(result)
             }
+
+            // One call for the whole selection. Skipped when nothing imported,
+            // so a fully failed batch doesn't look like a successful empty one.
+            if !imported.isEmpty { handlers.onImport(imported) }
         }
     }
 }
