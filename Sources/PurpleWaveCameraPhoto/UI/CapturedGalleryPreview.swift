@@ -5,7 +5,8 @@
 //  The photo screen's captured-media UI. The bottom-corner pile itself is
 //  shared with the video screen and lives in Core as `CapturedStackThumbnail`.
 //
-//   • `CapturedPhotoItem` — one captured image plus its category.
+//   • `CapturedPhotoItem` — one captured photo's encoded bytes plus a
+//     thumbnail. Full-resolution images are decoded on demand, never held.
 //   • `CapturedGalleryPreview` — the full-screen viewer opened on tap, with a
 //     swipeable pager (category name at the bottom) and a grid toggle.
 //
@@ -17,10 +18,42 @@ import Transmission
 import PurpleWaveCameraCore
 
 /// One captured (or imported) photo shown in the pile / preview.
+///
+/// Holds the **encoded** bytes plus a small thumbnail, never the full decoded
+/// image. A decoded 12MP frame is ~47 MB; the same photo encoded is 1–2 MB, and
+/// its thumbnail ~0.16 MB. Retaining decoded images meant a 30-shot session cost
+/// roughly 1.4 GB and the app was jetsammed — measured, not estimated.
+///
+/// The host already received the full-resolution image and data through
+/// `onCapture`, so this type exists purely to feed the pile and the preview.
+/// Neither needs a full-size bitmap resident: the pile draws at 46pt, and the
+/// pager decodes only the page being looked at.
 struct CapturedPhotoItem: Identifiable {
     let id = UUID()
-    let image: UIImage
+
+    /// Encoded HEIC/JPEG, exactly as delivered to the host.
+    let data: Data
+
+    /// Small bitmap for the pile and the grid. Always resident — it is cheap.
+    let thumbnail: UIImage
+
     let category: PWCategory?
+
+    /// Builds an item from the encoded bytes plus the full-size image the
+    /// thumbnail is derived from.
+    ///
+    /// `image` is read and dropped — it is never stored. If downscaling fails
+    /// the full image is kept as the thumbnail, which costs memory but is
+    /// better than a pile of blank tiles; in practice this does not happen.
+    init(data: Data, image: UIImage, category: PWCategory?) {
+        self.data = data
+        self.thumbnail = image.preparingThumbnail(of: Self.thumbnailSize) ?? image
+        self.category = category
+    }
+
+    /// Big enough for the 120pt grid cell on a 3× screen, small enough that a
+    /// hundred of them are still under 20 MB.
+    private static let thumbnailSize = CGSize(width: 400, height: 400)
 }
 
 // MARK: - Full-screen gallery preview
@@ -61,9 +94,15 @@ struct CapturedGalleryPreview: View {
     private var pagerView: some View {
         TabView(selection: $index) {
             ForEach(items.indices, id: \.self) { i in
-                ZoomablePage(image: items[i].image)
-                    .overlay(alignment: .bottom) { categoryLabel(items[i].category) }
-                    .tag(i)
+                // Full-resolution decode for the current page and its immediate
+                // neighbours only, so a swipe has the next image ready without
+                // every photo in the session being resident at once.
+                LazyDecodedPage(
+                    item: items[i],
+                    isActive: abs(i - index) <= 1
+                )
+                .overlay(alignment: .bottom) { categoryLabel(items[i].category) }
+                .tag(i)
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
@@ -76,7 +115,9 @@ struct CapturedGalleryPreview: View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 8) {
                 ForEach(items.indices, id: \.self) { i in
-                    Image(uiImage: items[i].image)
+                    // Thumbnails here, always. The grid draws at 120pt, so a
+                    // full-resolution decode per cell was pure waste.
+                    Image(uiImage: items[i].thumbnail)
                         .resizable()
                         .scaledToFill()
                         .frame(maxWidth: .infinity)
@@ -189,5 +230,52 @@ private struct ZoomablePage: View {
     private func reset() {
         scale = 1
         lastScale = 1
+    }
+}
+
+// MARK: - Lazily decoded page
+
+/// A pager page that decodes its full-resolution image only while it is the
+/// current page or an immediate neighbour, and drops it again afterwards.
+///
+/// Showing the thumbnail while inactive means a swipe never lands on an empty
+/// frame — the low-resolution version is already there and is replaced as soon
+/// as the decode finishes.
+private struct LazyDecodedPage: View {
+
+    let item: CapturedPhotoItem
+    let isActive: Bool
+
+    @State private var decoded: UIImage?
+
+    var body: some View {
+        Group {
+            if let decoded {
+                ZoomablePage(image: decoded)
+            } else {
+                // Placeholder at thumbnail resolution: visibly soft for a
+                // moment, which is better than a black frame.
+                Image(uiImage: item.thumbnail)
+                    .resizable()
+                    .scaledToFit()
+            }
+        }
+        .task(id: isActive) {
+            guard isActive else {
+                // Released as the page moves away, which is the whole point.
+                decoded = nil
+                return
+            }
+            guard decoded == nil else { return }
+
+            // Decode off the main actor; UIImage(data:) is lazy, so force the
+            // bitmap here rather than on the first draw.
+            let data = item.data
+            let image = await Task.detached(priority: .userInitiated) {
+                UIImage(data: data)?.preparingForDisplay()
+            }.value
+
+            if !Task.isCancelled { decoded = image }
+        }
     }
 }
