@@ -533,6 +533,15 @@ public struct PWVideoScreen: View {
         HapticsManager.shared.setupHapticEngine()
         HapticsManager.shared.addObservers()
 
+        // The preview canvas has no camera or microphone and nowhere to present
+        // a permission prompt, so the requests below would leave the screen
+        // stuck on its denied state — and requesting the microphone in a host
+        // without NSMicrophoneUsageDescription is fatal. Stop here and let the
+        // chrome render over an empty preview layer, which is what the canvas is
+        // useful for. The photo screen has always done this; the video screen
+        // was missing it, which is why only its previews were unusable.
+        guard !ProcessInfo.isRunningInXcodePreview else { return }
+
         // Ask up front rather than when a recording finishes, so the prompt
         // never lands mid-take. A denial is not fatal — clips just carry no
         // location.
@@ -741,3 +750,56 @@ private struct RecordButton: View {
     }
 }
 
+
+// MARK: - Previews
+
+// Two things the canvas cannot give us, both worth knowing before trusting what
+// you see here:
+//
+//   • There is no camera, so the preview layer stays black. These show the
+//     overlay chrome over it — top bar, timer, category control, record button.
+//   • Orientation comes from CoreMotion, which reports nothing in the canvas, so
+//     the monitor sits at its `.portrait` default and every preview renders the
+//     portrait state with the rotate-to-landscape notice. The landscape
+//     recording layout can only be seen on a device or in the demo app.
+
+#Preview("Video screen — full chrome") {
+    PWVideoScreen(
+        config: PWVideoConfig(
+            categories: [
+                PWCategory(id: "DRIVING", title: "Driving"),
+                PWCategory(id: "FUNCTIONAL", title: "Functional"),
+                PWCategory(id: "ENGINE", title: "Engine")
+            ],
+            startingCategoryID: "DRIVING",
+            maxDuration: 180,
+            overlayLabel: "MO6759"
+        ),
+        handlers: PWVideoHandlers(onRecord: { _ in })
+    )
+}
+
+#Preview("Video screen — no categories, no badge") {
+    // The minimal configuration: with the category control and badge both gone,
+    // the bottom controls have to hold their position rather than drifting down.
+    PWVideoScreen(
+        config: PWVideoConfig(),
+        handlers: PWVideoHandlers(onRecord: { _ in })
+    )
+}
+
+#Preview("Video screen — torch, gallery and ultra-wide off") {
+    // Every optional top-bar control hidden, which is the layout most likely to
+    // leave an awkward gap — and the one that regressed when the torch button
+    // was hardware-gated rather than disabled.
+    PWVideoScreen(
+        config: PWVideoConfig(
+            categories: [PWCategory("Driving"), PWCategory("Functional")],
+            allowsTorch: false,
+            allowsUltraWide: false,
+            allowsGallery: false,
+            overlayLabel: "MO6759"
+        ),
+        handlers: PWVideoHandlers(onRecord: { _ in })
+    )
+}
