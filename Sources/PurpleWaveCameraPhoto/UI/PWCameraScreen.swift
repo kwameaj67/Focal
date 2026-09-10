@@ -99,8 +99,7 @@ public struct PWCameraScreen: View {
         }
         .onAppear { if engine.isConfigured { engine.start(); orientation.start() } }
         .onDisappear { engine.stop(); orientation.stop() }
-        .sheet(isPresented: $showGallery) {
-        }
+        .sheet(isPresented: $showGallery) { galleryScreen }
     }
 
     /// The image that arcs from the shutter into the thumbnail slot.
