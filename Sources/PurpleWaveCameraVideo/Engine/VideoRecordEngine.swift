@@ -162,6 +162,12 @@ final class VideoRecordEngine: NSObject, ObservableObject {
     /// physically enabled while recording (matching FieldTool behaviour).
     @discardableResult
     func toggleTorch() -> Bool {
+        // Refuse when there's no torch. Without this the published state could
+        // read "on" for hardware that has none — the UI then showed a lit torch
+        // icon on a device that cannot light anything, and the settings wheel
+        // could select On for the same reason.
+        guard controller.hasTorch else { return isTorchOn }
+
         isTorchOn.toggle()
         if isRecording { controller.setTorch(isTorchOn) }
         return isTorchOn
