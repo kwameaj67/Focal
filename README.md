@@ -75,7 +75,7 @@ add it to a `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/PurpleWave/PurpleWaveCamera-iOS.git", from: "0.1.0")
+    .package(url: "https://github.com/PurpleWave/PurpleWaveCamera-iOS.git", from: "0.2.0")
 ],
 targets: [
     .target(name: "YourApp", dependencies: [
@@ -89,8 +89,9 @@ stills — it links no microphone code, so the host needs no
 `NSMicrophoneUsageDescription`.
 
 While the package is on `0.x`, `from:` resolves within a single minor version:
-`from: "0.1.0"` means `>=0.1.0, <0.2.0`. Every `0.y` bump may break API, which
-is deliberate while the surface is still moving.
+`from: "0.2.0"` means `>=0.2.0, <0.3.0`. Every `0.y` bump may break API, which
+is deliberate while the surface is still moving — and is why a `from: "0.1.0"`
+pin will not pick up 0.2.0 on its own.
 
 For local development you can also drag the `PurpleWaveCamera` folder in as a
 local package.
