@@ -53,6 +53,9 @@ public struct PWVideoScreen: View {
     @State private var exposureBias: Float = 0
     /// Non-nil while the self-timer counts down before recording starts.
     @State private var countdown: Int?
+    /// Whether the aspect/badge info tip is showing. Toggled by the info icon
+    /// in the top bar.
+    @State private var showInfoTip = false
 
     // MARK: Init
 
@@ -98,11 +101,8 @@ public struct PWVideoScreen: View {
         // Resume the session when the screen re-appears (e.g. after dismissing
         // the full-screen video preview) so the live feed doesn't stay frozen.
         .overlay {
-            if showSettings {
-                CaptureSettingsOverlay(isPresented: $showSettings) {
-                    settingsSheet
-                }
-                .transition(.move(edge: .bottom))
+            CaptureSettingsOverlay(isPresented: $showSettings) {
+                settingsSheet
             }
         }
         .onAppear { if engine.isConfigured { engine.start(); orientation.start() } }
@@ -162,8 +162,8 @@ public struct PWVideoScreen: View {
             settingsPane = .grid
             withAnimation(CaptureSettingsOverlay<EmptyView>.motion) { showSettings = true }
         } label: {
-            Image(systemName: "slider.horizontal.3")
-                .font(.system(size: 18, weight: .medium))
+            Image(systemName: "gearshape.fill")
+                .font(.system(size: 20, weight: .medium))
                 .foregroundColor(.white)
                 .frame(width: 50, height: 50)
                 .background(Circle().fill(Color.black.opacity(0.3)))
@@ -300,12 +300,22 @@ public struct PWVideoScreen: View {
     private var overlays: some View {
         VStack(spacing: 0) {
             topBar
+                // Anchored under the bar's trailing edge so the caret lands on
+                // the info icon.
+                .overlay(alignment: .topTrailing) {
+                    if showInfoTip {
+                        infoTip
+                            .padding(.top, 46)
+                            .padding(.trailing, 52)
+                    }
+                }
+                .zIndex(1)   // the tip must draw over the preview below it
+
+            timerPill
+
             Spacer()
-            HStack(spacing: 12) {
-                ZoomBadge(text: engine.zoomText, rotation: orientation.angle)
-                settingsButton
-            }
-            .padding(.bottom, 8)
+            ZoomBadge(text: engine.zoomText, rotation: orientation.angle)
+                .padding(.bottom, 8)
             if !config.categories.isEmpty {
                 // Same selector as the photo screen: centered pills, swipe to
                 // step between categories, tap to jump.
@@ -322,22 +332,19 @@ public struct PWVideoScreen: View {
 
     private var topBar: some View {
         HStack {
-            if config.allowsTorch && engine.hasTorch {
+            // Always rendered when the host allows a torch, so the top-left
+            // always shows torch state — matching the photo screen, whose flash
+            // control isn't hardware-gated either. Previously this was hidden
+            // whenever `hasTorch` was false, which left the corner empty on any
+            // device without a torch and made the two screens look different.
+            if config.allowsTorch {
                 iconButton(
                     systemName: engine.isTorchOn ? "bolt.fill" : "bolt.slash",
                     tint: engine.isTorchOn ? .yellow : .white
                 ) { engine.toggleTorch(); HapticsManager.shared.tap() }
+                    .disabled(!engine.hasTorch)
+                    .opacity(engine.hasTorch ? 1 : 0.4)
             }
-
-            Spacer()
-
-            Text(timerString)
-                .font(.system(size: 22, weight: .bold, design: .monospaced))
-                .foregroundColor(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(timerBackground)
-                .cornerRadius(5)
 
             Spacer()
 
@@ -350,15 +357,60 @@ public struct PWVideoScreen: View {
             if config.allowsGallery {
                 iconButton(systemName: "photo.on.rectangle") {
                     HapticsManager.shared.tap()
-                    showGallery = true
+                    openGallery()
                 }
                 .disabled(engine.isRecording)
             }
-            if let label = config.overlayLabel {
-                IcnBadge(icn: label)
-            }
+            infoButton
+            settingsButton
         }
         .padding(.horizontal, 20)
+    }
+
+    /// Toggles the info tip. Filled while open so the icon reads as a state,
+    /// not just a button.
+    private var infoButton: some View {
+        iconButton(
+            systemName: showInfoTip ? "info.circle.fill" : "info.circle",
+            tint: showInfoTip ? .yellow : .white
+        ) {
+            HapticsManager.shared.tap()
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.8)) {
+                showInfoTip.toggle()
+            }
+        }
+    }
+
+    /// Aspect framing and the item badge, shown on demand rather than parked
+    /// permanently over the viewfinder — matching the photo screen.
+    private var infoTip: some View {
+        InfoTip {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(aspectRatio.title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+
+                if let label = config.overlayLabel {
+                    Text(label)
+                        .font(.system(size: 13))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+            }
+        }
+    }
+
+    /// Elapsed-time pill. Sits below the bar rather than in it: centring it
+    /// between two Spacers made its width push the surrounding controls around
+    /// as the digits changed.
+    private var timerPill: some View {
+        Text(timerString)
+            .font(.system(size: 15, weight: .bold, design: .monospaced))
+            .foregroundColor(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(timerBackground)
+            .cornerRadius(5)
+            .padding(.top, 8)
     }
 
     private var bottomControls: some View {
@@ -441,6 +493,24 @@ public struct PWVideoScreen: View {
 
     // MARK: - Gallery
 
+    /// Requests photo-library access, then presents the picker only if it was
+    /// granted.
+    ///
+    /// Asked here rather than at screen setup so declining the library costs
+    /// the user the gallery button, not the camera. A denial is reported
+    /// through `onError` so the host knows why nothing opened, but the capture
+    /// screen stays usable.
+    private func openGallery() {
+        Task {
+            if await MediaPermissions.requestPhotoLibrary() {
+                showGallery = true
+            } else {
+                handlers.onError(.permissionDenied(.photoLibrary))
+            }
+        }
+    }
+
+
     private var galleryScreen: some View {
         MediaGalleryScreen(
             mediaType: .video,
@@ -473,8 +543,7 @@ public struct PWVideoScreen: View {
         engine.maxDuration = config.maxDuration
         engine.recordingHandler = handleRecording
 
-        let needsLibrary = config.allowsGallery || config.savesToPhotoLibrary
-        if let denied = await MediaPermissions.ensureVideoPermissions(needsLibrary: needsLibrary) {
+        if let denied = await MediaPermissions.ensureVideoPermissions() {
             deniedPermission = denied
             didSetUp = false   // allow a retry if the user grants access and returns
             handlers.onError(.permissionDenied(denied))
@@ -538,8 +607,15 @@ public struct PWVideoScreen: View {
                 category: selectedCategory, source: .camera
             )
             performDrop(flying: video.thumbnail, commit: item)
+            // Fire and forget: saving must not delay onRecord, and the add
+            // permission prompt would otherwise sit between the user finishing
+            // a recording and the host hearing about it.
             if config.savesToPhotoLibrary {
-                PhotoLibrarySaver.save(videoURL: video.url)
+                Task {
+                    if await PhotoLibrarySaver.ensureAddPermission() {
+                        PhotoLibrarySaver.save(videoURL: video.url)
+                    }
+                }
             }
             let capturedAt = Date()
             Task {
@@ -583,33 +659,58 @@ public struct PWVideoScreen: View {
     private func importVideos(_ assets: [PHAsset]) {
         Task {
             let directory = OutputDirectory.resolve(config.outputDirectory)
+
+            // Collected so the batch callback can report the whole selection
+            // once, alongside the per-item callbacks that fire as each lands.
+            var imported: [PWVideoResult] = []
+
             for asset in assets {
-                guard let imported = await MediaImporter.importVideo(
+                guard let item = await MediaImporter.importVideo(
                     asset, into: directory, maxFileSizeMB: config.maxFileSizeMB
-                ) else { continue }
+                ) else {
+                    // Reported rather than silently dropped. This matters more
+                    // than for photos: maxFileSizeMB rejects oversized clips, so
+                    // a host that picked five and got three needs to know a size
+                    // limit was the reason.
+                    handlers.onError(.videoRecordingFailed(
+                        "Could not import a selected video — it may exceed the "
+                        + "\(Int(config.maxFileSizeMB)) MB limit"
+                    ))
+                    continue
+                }
 
                 didRecordAny = true
-                let thumb = await MediaImporter.thumbnail(for: imported.url)
+                let thumb = await MediaImporter.thumbnail(for: item.url)
                 recorded.append(CapturedVideoItem(
-                    thumbnail: thumb, url: imported.url,
+                    thumbnail: thumb, url: item.url,
                     category: selectedCategory, source: .gallery
                 ))
 
                 if config.savesToPhotoLibrary {
-                    PhotoLibrarySaver.save(videoURL: imported.url)
+                    Task {
+                        if await PhotoLibrarySaver.ensureAddPermission() {
+                            PhotoLibrarySaver.save(videoURL: item.url)
+                        }
+                    }
                 }
 
-                handlers.onRecord(PWVideoResult(
-                    fileURL: imported.url,
+                let result = PWVideoResult(
+                    fileURL: item.url,
                     category: selectedCategory,
-                    duration: imported.duration,
+                    duration: item.duration,
                     thumbnail: thumb,
                     source: .gallery,
                     // No location for imports — see the photo screen.
                     location: nil,
                     capturedAt: Date()
-                ))
+                )
+                imported.append(result)
+                handlers.onRecord(result)
             }
+
+            // One call for the whole selection. Skipped when nothing imported,
+            // so a fully failed batch doesn't look like a successful empty one.
+            if !imported.isEmpty { handlers.onImport(imported) }
         }
     }
 }
