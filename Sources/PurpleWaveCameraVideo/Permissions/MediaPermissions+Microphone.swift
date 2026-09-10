@@ -28,16 +28,16 @@ public extension MediaPermissions {
         await AVCaptureDevice.requestAccess(for: .audio)
     }
 
-    /// Ensures every permission required by a *video* flow is granted (camera +
-    /// microphone, plus library when needed).
+    /// Ensures every permission required to *start recording* is granted:
+    /// camera and microphone.
+    ///
+    /// Library access is deliberately not included — it is requested when the
+    /// user opens the gallery, and add-only when a recording is saved.
     ///
     /// - Returns: `nil` on success, or the first denied permission.
-    static func ensureVideoPermissions(
-        needsLibrary: Bool
-    ) async -> PWPermission? {
+    static func ensureVideoPermissions() async -> PWPermission? {
         if !(await requestCamera()) { return .camera }
         if !(await requestMicrophone()) { return .microphone }
-        if needsLibrary, !(await requestPhotoLibrary()) { return .photoLibrary }
         return nil
     }
 }
