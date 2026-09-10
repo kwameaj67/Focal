@@ -44,6 +44,7 @@ public extension PWCamera {
         // control back to the host.
         let wrapped = PWPhotoHandlers(
             onCapture: handlers.onCapture,
+            onImport: handlers.onImport,
             onFinish: { reason in
                 holder.controller?.dismiss(animated: true)
                 handlers.onFinish(reason)
@@ -67,6 +68,7 @@ public extension PWCamera {
     ) -> UIViewController {
         let handlers = PWPhotoHandlers(
             onCapture: { [weak delegate] in delegate?.photoCapture(didCapture: $0) },
+            onImport: { [weak delegate] in delegate?.photoCapture(didImport: $0) },
             onFinish: { [weak delegate] in delegate?.photoCapture(didFinish: $0) },
             onError: { [weak delegate] in delegate?.photoCapture(didFail: $0) }
         )
