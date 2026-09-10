@@ -24,6 +24,10 @@ recorder so it can be dropped into any app with no FieldTool dependencies.
 | :---: | :---: | :---: | :---: | :---: |
 | <img src="Docs/Screenshots/photo-screen.png" width="150"> | <img src="Docs/Screenshots/photo-info-tip.png" width="150"> | <img src="Docs/Screenshots/capture-settings.png" width="150"> | <img src="Docs/Screenshots/aspect-ratio.png" width="150"> | <img src="Docs/Screenshots/video-screen.png" width="150"> |
 
+| Gallery import | Nothing to import |
+| :---: | :---: |
+| <img src="Docs/Screenshots/gallery-picker.png" width="150"> | <img src="Docs/Screenshots/gallery-empty.png" width="150"> |
+
 > Taken in the Simulator, which has no camera, so the viewfinder is black.
 > Everything else is what the SDK draws. The video screen is shown in portrait,
 > where it blocks recording and asks the user to rotate.
@@ -42,6 +46,7 @@ Both screens share the same capture feature set:
 | Flash (photo) / Torch (video) | ✅ | ✅ |
 | Ultra-wide ↔ wide lens switch | ✅ | ✅ |
 | Custom multi-select gallery import | ✅ | ✅ |
+| Day-grouped picker with empty / denied states | ✅ | ✅ |
 | Batch callback for a whole import | ✅ | ✅ |
 | Consumer-defined category selector | ✅ (scroll) | ✅ (segmented) |
 | Optional save-to-photo-library | ✅ | ✅ |
