@@ -42,6 +42,7 @@ public extension PWCamera {
 
         let wrapped = PWVideoHandlers(
             onRecord: handlers.onRecord,
+            onImport: handlers.onImport,
             onFinish: { reason in
                 holder.controller?.dismiss(animated: true)
                 handlers.onFinish(reason)
@@ -65,6 +66,7 @@ public extension PWCamera {
     ) -> UIViewController {
         let handlers = PWVideoHandlers(
             onRecord: { [weak delegate] in delegate?.videoRecorder(didRecord: $0) },
+            onImport: { [weak delegate] in delegate?.videoRecorder(didImport: $0) },
             onFinish: { [weak delegate] in delegate?.videoRecorder(didFinish: $0) },
             onError: { [weak delegate] in delegate?.videoRecorder(didFail: $0) }
         )
