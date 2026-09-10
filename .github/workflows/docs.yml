@@ -1,4 +1,4 @@
-name: Deploy DocC to GitHub Pages
+name: Build DocC
 
 on:
   # Runs after the "Run Tests" workflow finishes on main, rather than on push
@@ -111,13 +111,24 @@ jobs:
         with:
           path: docs-build
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+  # Publishing to GitHub Pages is disabled.
+  #
+  # The build job above still runs, so a change that breaks DocC is caught in
+  # CI and the rendered site is downloadable from the run's artifacts — only
+  # the public deployment is switched off.
+  #
+  # To turn it back on: enable Pages for the repository (Settings ▸ Pages ▸
+  # Source: GitHub Actions), then uncomment the job below. Nothing else needs
+  # to change — the `pages: write` and `id-token: write` permissions and the
+  # "pages" concurrency group above are already in place for it.
+  #
+  # deploy:
+  #   needs: build
+  #   runs-on: ubuntu-latest
+  #   environment:
+  #     name: github-pages
+  #     url: ${{ steps.deployment.outputs.page_url }}
+  #   steps:
+  #     - name: Deploy to GitHub Pages
+  #       id: deployment
+  #       uses: actions/deploy-pages@v4
