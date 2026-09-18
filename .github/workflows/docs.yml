@@ -39,7 +39,7 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      # CameraSDK targets iOS only (it imports UIKit), so documentation has to
+      # Focal targets iOS only (it imports UIKit), so documentation has to
       # be built against the iOS Simulator SDK via xcodebuild — `swift package
       # generate-documentation` builds for macOS by default and fails outright, since
       # this package can't compile there.
@@ -49,7 +49,7 @@ jobs:
       - name: Build documentation archives
         run: |
           xcodebuild docbuild \
-            -scheme camera-sdk-ios-Package \
+            -scheme focal-ios-Package \
             -destination "generic/platform=iOS Simulator" \
             -derivedDataPath ./.derivedData-docc
 
@@ -57,12 +57,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Three documented modules: Core, Photo, Video. The CameraSDK
+          # Three documented modules: Core, Photo, Video. The Focal
           # umbrella target is deliberately excluded — it contains nothing but
           # `@_exported import` lines, so its archive has no symbols of its own
           # and would render as an empty module page next to the real three.
           ARCHIVES=()
-          for module in CameraSDKCore CameraSDKPhoto CameraSDKVideo; do
+          for module in FocalCore FocalPhoto FocalVideo; do
             found=$(find ./.derivedData-docc -name "${module}.doccarchive" -maxdepth 6 | head -n 1)
             if [ -z "$found" ]; then
               echo "error: no .doccarchive produced for ${module}" >&2
@@ -77,7 +77,7 @@ jobs:
           # combines them into a single archive with a landing page listing all
           # three, which then transforms cleanly.
           xcrun docc merge "${ARCHIVES[@]}" \
-            --synthesized-landing-page-name "CameraSDK" \
+            --synthesized-landing-page-name "Focal" \
             --output-path ./merged.doccarchive
 
           # No --hosting-base-path: this site is private (restricted to users with

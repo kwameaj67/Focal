@@ -17,10 +17,10 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      # Scheme is camera-sdk-ios-Package, not CameraSDK. Once the
+      # Scheme is focal-ios-Package, not Focal. Once the
       # package declared more than one library product, SwiftPM started
       # generating a scheme per product plus a combined "-Package" scheme, and
-      # only the combined one carries a test action — `-scheme CameraSDK`
+      # only the combined one carries a test action — `-scheme Focal`
       # fails with "not currently configured for the test action".
       #
       # Device name pinned to something recent enough to exist on the runner's default
@@ -30,7 +30,7 @@ jobs:
       - name: Run tests
         run: |
           xcodebuild test \
-            -scheme camera-sdk-ios-Package \
+            -scheme focal-ios-Package \
             -destination "platform=iOS Simulator,name=iPhone 16" \
             -resultBundlePath ./TestResults.xcresult
 

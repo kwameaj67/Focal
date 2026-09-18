@@ -1,4 +1,4 @@
-# CameraSDK
+# Focal
 
 A Swift Package that renders a **camera capture screen** and a **landscape video
 recorder** for iOS. Built SwiftUI-first, with AVFoundation doing the capture
@@ -109,16 +109,16 @@ add it to a `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/PurpleWave/camera-sdk-ios.git", from: "0.2.0")
+    .package(url: "https://github.com/your-org/focal-ios.git", from: "0.2.0")
 ],
 targets: [
     .target(name: "YourApp", dependencies: [
-        .product(name: "CameraSDK", package: "camera-sdk-ios")
+        .product(name: "Focal", package: "focal-ios")
     ])
 ]
 ```
 
-Depend on `CameraSDKPhoto` instead of the umbrella if you only capture
+Depend on `FocalPhoto` instead of the umbrella if you only capture
 stills — it links no microphone code, so the host needs no
 `NSMicrophoneUsageDescription`.
 
@@ -127,7 +127,7 @@ While the package is on `0.x`, `from:` resolves within a single minor version:
 is deliberate while the surface is still moving — and is why a `from: "0.1.0"`
 pin will not pick up 0.2.0 on its own.
 
-For local development you can also drag the `CameraSDK` folder in as a
+For local development you can also drag the `Focal` folder in as a
 local package.
 
 ---
@@ -174,7 +174,7 @@ camera working. Only a denied **camera** blocks the screen, which shows an
 
 ```swift
 import SwiftUI
-import CameraSDK
+import Focal
 
 struct CaptureExample: View {
     @State private var showCamera = false
@@ -182,17 +182,17 @@ struct CaptureExample: View {
     var body: some View {
         Button("Take photos") { showCamera = true }
             .fullScreenCover(isPresented: $showCamera) {
-                CSCameraScreen(
-                    config: CSCameraConfig(
+                FCCameraScreen(
+                    config: FCCameraConfig(
                         categories: [
-                            CSCategory(id: "AMKT", title: "Profile"),
-                            CSCategory(id: "STICKER", title: "Sticker"),
-                            CSCategory(id: "WALK", title: "Walk Around")
+                            FCCategory(id: "AMKT", title: "Profile"),
+                            FCCategory(id: "STICKER", title: "Sticker"),
+                            FCCategory(id: "WALK", title: "Walk Around")
                         ],
                         startingCategoryID: "AMKT",
                         overlayLabel: "MO6759"
                     ),
-                    handlers: CSPhotoHandlers(
+                    handlers: FCPhotoHandlers(
                         onCapture: { result in
                             // result.imageData, result.image, result.category …
                             print("Captured a \(result.category?.title ?? "photo")")
@@ -213,13 +213,13 @@ struct CaptureExample: View {
 
 ```swift
 import UIKit
-import CameraSDK
+import Focal
 
 final class MyViewController: UIViewController {
     func openCamera() {
-        let vc = CSCamera.makePhotoCapture(
-            config: CSCameraConfig(categories: [CSCategory("Profile")]),
-            handlers: CSPhotoHandlers(
+        let vc = FCCamera.makePhotoCapture(
+            config: FCCameraConfig(categories: [FCCategory("Profile")]),
+            handlers: FCPhotoHandlers(
                 onCapture: { result in /* store result */ },
                 onFinish:  { _ in /* controller dismisses itself */ }
             )
@@ -232,19 +232,19 @@ final class MyViewController: UIViewController {
 A delegate-based overload is also available:
 
 ```swift
-let vc = CSCamera.makePhotoCapture(config: config, delegate: self)
-// self: CSPhotoCaptureDelegate  (held weakly)
+let vc = FCCamera.makePhotoCapture(config: config, delegate: self)
+// self: FCPhotoCaptureDelegate  (held weakly)
 ```
 
 ### Video
 
 ```swift
-CSVideoScreen(
-    config: CSVideoConfig(
+FCVideoScreen(
+    config: FCVideoConfig(
         categories: [
-            CSCategory("Driving"),
-            CSCategory("Functional"),
-            CSCategory("Engine")
+            FCCategory("Driving"),
+            FCCategory("Functional"),
+            FCCategory("Engine")
         ],
         maxDuration: 180,                       // auto-stop after 3 minutes
         landscapeOnly: true,                    // portrait shows a "rotate" prompt
@@ -252,7 +252,7 @@ CSVideoScreen(
         presetByCategoryID: ["Driving": .hd1080],
         defaultPreset: .hd720
     ),
-    handlers: CSVideoHandlers(
+    handlers: FCVideoHandlers(
         onRecord: { result in
             // result.fileURL is a local .mov you now own — move or upload it
         },
@@ -264,14 +264,14 @@ CSVideoScreen(
 )
 ```
 
-UIKit: `CSCamera.makeVideoRecorder(config:handlers:)` /
+UIKit: `FCCamera.makeVideoRecorder(config:handlers:)` /
 `makeVideoRecorder(config:delegate:)`.
 
 ---
 
 ## Configuration reference
 
-### `CSCameraConfig` (photo)
+### `FCCameraConfig` (photo)
 
 | Property | Default | Description |
 | --- | --- | --- |
@@ -281,12 +281,12 @@ UIKit: `CSCamera.makeVideoRecorder(config:handlers:)` /
 | `defaultFrameRate` | `.fps60` | Starting capture frame rate; the user can toggle 60 ⁄ 30 fps from the rail. Falls back to the highest the device/format supports. |
 | `allowsGallery` | `true` | Show the library-import button. |
 | `allowsUltraWide` | `true` | Show the ultra-wide toggle (device permitting). |
-| `savesToPhotoLibrary` | `false` | Also save captures to the `CameraSDK` album. |
+| `savesToPhotoLibrary` | `false` | Also save captures to the `Focal` album. |
 | `capturesLocation` | `false` | Attach a location fix to each result. Needs `NSLocationWhenInUseUsageDescription`. |
 | `overlayLabel` | `nil` | Badge text shown in the info tip (e.g. an item ID). |
 | `outputDirectory` | `nil` | Unused by the photo screen — it writes no files. Present for symmetry with the video config. |
 
-### `CSVideoConfig` (video)
+### `FCVideoConfig` (video)
 
 | Property | Default | Description |
 | --- | --- | --- |
@@ -300,7 +300,7 @@ UIKit: `CSCamera.makeVideoRecorder(config:handlers:)` /
 | `allowsTorch` | `true` | Show the torch button. |
 | `allowsUltraWide` | `true` | Show the ultra-wide toggle. |
 | `allowsGallery` | `true` | Show the library-import button. |
-| `savesToPhotoLibrary` | `false` | Also save recordings to the `CameraSDK` album. |
+| `savesToPhotoLibrary` | `false` | Also save recordings to the `Focal` album. |
 | `capturesLocation` | `false` | Attach a location fix to each result. Needs `NSLocationWhenInUseUsageDescription`. |
 | `maxFileSizeMB` | `400` | Reject imported videos larger than this. |
 | `overlayLabel` | `nil` | Badge text shown in the info tip. |
@@ -332,7 +332,7 @@ that want to act on the selection as a set — uploading a batch together, or
 showing one "12 photos added" confirmation instead of twelve.
 
 ```swift
-CSPhotoHandlers(
+FCPhotoHandlers(
     onCapture: { result in
         // Fires 12 times for a 12-photo selection, one at a time.
         stage(result)
@@ -345,9 +345,9 @@ CSPhotoHandlers(
 ```
 
 ```swift
-extension MyViewController: CSPhotoCaptureDelegate {
-    func photoCapture(didCapture result: CSPhotoResult) { stage(result) }
-    func photoCapture(didImport results: [CSPhotoResult]) { upload(batch: results) }
+extension MyViewController: FCPhotoCaptureDelegate {
+    func photoCapture(didCapture result: FCPhotoResult) { stage(result) }
+    func photoCapture(didImport results: [FCPhotoResult]) { upload(batch: results) }
 }
 ```
 
@@ -359,11 +359,11 @@ Two things to know:
 - **It does not fire for live captures**, and it does not fire at all when a
   selection produced nothing.
 
-### `CSPhotoResult`
+### `FCPhotoResult`
 - `imageData: Data` — encoded (HEVC/JPEG) bytes.
 - `image: UIImage` — decoded from `imageData` on first access, then held. See
   [Memory](#memory) below.
-- `category: CSCategory?` — selected category (if any).
+- `category: FCCategory?` — selected category (if any).
 - `source: .camera | .gallery`
 - `orientation: UIDeviceOrientation` — device orientation at capture.
 - `metadata: [String: Any]?` — capture metadata when available.
@@ -373,10 +373,10 @@ Two things to know:
 - `capturedAt: Date` — for an import, the time of import rather than the
   asset's original creation date.
 
-### `CSVideoResult`
+### `FCVideoResult`
 - `fileURL: URL` — local `.mov` file; **ownership transfers to you** (move or
   delete it — the SDK writes to a temp directory by default).
-- `category: CSCategory?`
+- `category: FCCategory?`
 - `duration: TimeInterval`
 - `thumbnail: UIImage?` — at most 400×400.
 - `source: .camera | .gallery`
@@ -393,7 +393,7 @@ can — never one per photo taken:
 - The on-screen pile and grid keep a small thumbnail and the encoded bytes. The
   full-screen preview decodes the page you are looking at and its immediate
   neighbours, and releases the rest as you swipe.
-- `CSPhotoResult.image` decodes on first access and caches from then on, so a
+- `FCPhotoResult.image` decodes on first access and caches from then on, so a
   batch import hands you encoded bytes and nothing more until you ask for
   pixels. Reading `image` repeatedly — inside a SwiftUI `body`, say — costs
   nothing after the first read.
@@ -411,7 +411,7 @@ If you'd rather gate access yourself before presenting a screen:
 ```swift
 let denied = await MediaPermissions.ensureVideoPermissions()
 if denied == nil {
-    // present CSVideoScreen
+    // present FCVideoScreen
 } else {
     MediaPermissions.openSettings()
 }
@@ -425,7 +425,7 @@ so declining the library no longer takes down a working camera.
 | Function | Target |
 | --- | --- |
 | `cameraStatus()` / `requestCamera()` | Camera |
-| `microphoneStatus()` / `requestMicrophone()` | Microphone (`CameraSDKVideo` only) |
+| `microphoneStatus()` / `requestMicrophone()` | Microphone (`FocalVideo` only) |
 | `photoLibraryStatus()` / `requestPhotoLibrary()` | Library read |
 | `requestPhotoLibraryAdd()` | Library add-only |
 | `ensurePhotoPermissions()` | Camera |
@@ -437,43 +437,43 @@ so declining the library no longer takes down a working camera.
 ## Architecture
 
 Four targets. Three do the work; the fourth is an umbrella that re-exports them
-so `import CameraSDK` gives you everything, as it always did.
+so `import Focal` gives you everything, as it always did.
 
 ```
-CameraSDKCore ──┬── CameraSDKPhoto ──┐
-                │                    ├── CameraSDK (umbrella)
-                └── CameraSDKVideo ──┘
+FocalCore ──┬── FocalPhoto ──┐
+                │                    ├── Focal (umbrella)
+                └── FocalVideo ──┘
 ```
 
 ```
 Sources/
-├─ CameraSDKCore/     everything both capture modes share
+├─ FocalCore/     everything both capture modes share
 │  ├─ Engine/       CameraSessionController (session, device, queue, zoom,
 │  │                focus, lens swap), the preview UIViewRepresentable,
 │  │                orientation monitor, haptics, photo-library saving
 │  ├─ Gallery/      SwiftUI multi-select PHAsset picker + import helpers
 │  ├─ Permissions/  Camera / photo-library helpers (no microphone)
-│  ├─ Public/       CSCategory, shared result values, the CSCamera namespace
+│  ├─ Public/       FCCategory, shared result values, the FCCamera namespace
 │  └─ UI/           Category bar, drop animation, shared badges/overlays
-├─ CameraSDKPhoto/    stills: photo output, flash, CSCameraScreen
-├─ CameraSDKVideo/    recording: movie output, microphone, torch,
-│                            presets, CSVideoScreen
-└─ CameraSDK/         umbrella; re-exports the three above
+├─ FocalPhoto/    stills: photo output, flash, FCCameraScreen
+├─ FocalVideo/    recording: movie output, microphone, torch,
+│                            presets, FCVideoScreen
+└─ Focal/         umbrella; re-exports the three above
 ```
 
 ### Which target to depend on
 
 | Depend on | You get | Microphone |
 | --- | --- | --- |
-| `CameraSDK` | Everything (photo + video) | Required |
-| `CameraSDKPhoto` | Stills only | **Not needed** |
-| `CameraSDKVideo` | Recording only | Required |
-| `CameraSDKCore` | Session plumbing, no screens | Not needed |
+| `Focal` | Everything (photo + video) | Required |
+| `FocalPhoto` | Stills only | **Not needed** |
+| `FocalVideo` | Recording only | Required |
+| `FocalCore` | Session plumbing, no screens | Not needed |
 
 The microphone column is the reason the package is split. Every
 `AVCaptureDevice` audio call — querying authorization, requesting it, and
-attaching the input — lives in `CameraSDKVideo`. A host that depends only
-on `CameraSDKPhoto` links none of it, so it needs no
+attaching the input — lives in `FocalVideo`. A host that depends only
+on `FocalPhoto` links none of it, so it needs no
 `NSMicrophoneUsageDescription` and discloses no microphone access in App Store
 privacy details. (Requesting microphone access without that Info.plist key
 crashes the app, so this is a correctness boundary, not just tidiness.)
@@ -502,10 +502,10 @@ Design notes:
 This SDK is purely camera and video capture. It does **not** include any
 application business logic: persistence, upload queues, telemetry, CDN wiring,
 analytics, or barcode scanning. Those remain the host app's responsibility —
-feed the `CSPhotoResult` / `CSVideoResult` into your own pipeline.
+feed the `FCPhotoResult` / `FCVideoResult` into your own pipeline.
 
 ---
 
 ## License
 
-Proprietary — © Purple Wave, Inc. Internal use.
+Distributed under the BSD 2-Clause License. See LICENSE.md for more information.
