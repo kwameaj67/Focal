@@ -73,6 +73,11 @@ package struct CameraPreviewView: UIViewRepresentable {
             target: context.coordinator,
             action: #selector(Coordinator.handleTap(_:))
         )
+        // The preview fills the whole screen, so its tap recognizer would
+        // otherwise swallow taps meant for the SwiftUI controls layered over it
+        // (close, settings, shutter, the tool rail). The delegate restricts the
+        // focus tap to the bare preview.
+        tap.delegate = context.coordinator
         view.addGestureRecognizer(tap)
 
         let pinch = UIPinchGestureRecognizer(
@@ -106,7 +111,7 @@ package struct CameraPreviewView: UIViewRepresentable {
     }
 
     /// Routes UIKit gesture callbacks back into SwiftUI closures.
-    package final class Coordinator: NSObject {
+    package final class Coordinator: NSObject, UIGestureRecognizerDelegate {
         var onTapToFocus: ((_ devicePoint: CGPoint, _ touchPoint: CGPoint) -> Void)?
         var onPinch: ((CGFloat, UIGestureRecognizer.State) -> Void)?
         var onHardwareShutter: (() -> Void)?
@@ -135,6 +140,17 @@ package struct CameraPreviewView: UIViewRepresentable {
 
         @objc func handlePinch(_ gesture: UIPinchGestureRecognizer) {
             onPinch?(gesture.scale, gesture.state)
+        }
+
+        /// Only fire the focus tap when the touch lands on the bare preview, not
+        /// on a SwiftUI control layered above it — otherwise the full-bleed
+        /// preview's recognizer eats taps meant for those buttons (the close
+        /// button being the reported casualty).
+        package func gestureRecognizer(
+            _ gestureRecognizer: UIGestureRecognizer,
+            shouldReceive touch: UITouch
+        ) -> Bool {
+            touch.view === gestureRecognizer.view
         }
     }
 }

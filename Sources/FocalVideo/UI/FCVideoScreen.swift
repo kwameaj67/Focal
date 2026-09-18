@@ -28,6 +28,10 @@ public struct FCVideoScreen: View {
     @StateObject private var engine: VideoRecordEngine
     @StateObject private var orientation = DeviceOrientationMonitor()
 
+    /// Dismisses the screen when presented via `.sheet` / `.fullScreenCover`, so
+    /// finishing dismisses the recorder even if the host's `onFinish` doesn't.
+    @Environment(\.dismiss) private var dismiss
+
     @State private var selectedCategory: FCCategory?
     @State private var showGallery = false
     @State private var focusPoint: CGPoint?
@@ -87,7 +91,7 @@ public struct FCVideoScreen: View {
         Group {
             if let deniedPermission {
                 PermissionDeniedView(permission: deniedPermission) {
-                    handlers.onFinish(.cancelled)
+                    finish(.cancelled)
                 }
             } else {
                 cameraLayout
@@ -425,10 +429,18 @@ public struct FCVideoScreen: View {
     /// session, mirroring the old Cancel button, and is blocked mid-take.
     private var closeButton: some View {
         iconButton(systemName: "xmark") {
-            handlers.onFinish(didRecordAny ? .done : .cancelled)
+            finish(didRecordAny ? .done : .cancelled)
         }
         .disabled(engine.isRecording)
         .accessibilityLabel("Close")
+    }
+
+    /// Notifies the host via `onFinish` and dismisses the screen. The `dismiss()`
+    /// handles the common `.sheet` / `.fullScreenCover` presentation; it's a
+    /// no-op under the UIKit factory, which dismisses its own controller.
+    private func finish(_ reason: FCFinishReason) {
+        handlers.onFinish(reason)
+        dismiss()
     }
 
     // MARK: - Tool rail
