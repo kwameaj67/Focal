@@ -31,7 +31,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "focal-ios",
+    name: "Focal",
     // iOS 17 minimum: lets us use modern AVFoundation (maxPhotoDimensions),
     // SwiftUI navigation, and custom sheet detents without availability shims.
     platforms: [

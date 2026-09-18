@@ -39,12 +39,12 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      # Same scheme and destination as test.yml. focal-ios-Package is the
+      # Same scheme and destination as test.yml. Focal-Package is the
       # only scheme with a test action once the package has multiple products.
       - name: Run tests
         run: |
           xcodebuild test \
-            -scheme focal-ios-Package \
+            -scheme Focal-Package \
             -destination "platform=iOS Simulator,name=iPhone 16" \
             -resultBundlePath ./TestResults.xcresult
 

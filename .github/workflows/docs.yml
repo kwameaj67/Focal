@@ -49,7 +49,7 @@ jobs:
       - name: Build documentation archives
         run: |
           xcodebuild docbuild \
-            -scheme focal-ios-Package \
+            -scheme Focal-Package \
             -destination "generic/platform=iOS Simulator" \
             -derivedDataPath ./.derivedData-docc
 

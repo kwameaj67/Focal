@@ -17,7 +17,7 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      # Scheme is focal-ios-Package, not Focal. Once the
+      # Scheme is Focal-Package, not Focal. Once the
       # package declared more than one library product, SwiftPM started
       # generating a scheme per product plus a combined "-Package" scheme, and
       # only the combined one carries a test action — `-scheme Focal`
@@ -30,7 +30,7 @@ jobs:
       - name: Run tests
         run: |
           xcodebuild test \
-            -scheme focal-ios-Package \
+            -scheme Focal-Package \
             -destination "platform=iOS Simulator,name=iPhone 16" \
             -resultBundlePath ./TestResults.xcresult
 
