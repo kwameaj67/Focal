@@ -109,7 +109,7 @@ add it to a `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/your-org/focal-ios.git", from: "0.2.0")
+    .package(url: "https://github.com/kwameaj67/focal-ios.git", from: "0.2.0")
 ],
 targets: [
     .target(name: "YourApp", dependencies: [
