@@ -24,13 +24,13 @@ work. Self-contained and domain-agnostic, so it can be dropped into any app.
 | :---: | :---: |
 | <img src="Docs/Screenshots/photo-screen.png" width="230"> | <img src="Docs/Screenshots/video-screen.png" width="230"> |
 
-| Info tip | Self-timer | Settings | Aspect ratio |
+| Settings | Aspect ratio | Self-timer | Exposure |
 | :---: | :---: | :---: | :---: |
-| <img src="Docs/Screenshots/photo-info-tip.png" width="170"> | <img src="Docs/Screenshots/capture-timer.png" width="170"> | <img src="Docs/Screenshots/capture-settings.png" width="170"> | <img src="Docs/Screenshots/aspect-ratio.png" width="170"> |
+| <img src="Docs/Screenshots/capture-settings.png" width="170"> | <img src="Docs/Screenshots/aspect-ratio.png" width="170"> | <img src="Docs/Screenshots/capture-timer.png" width="170"> | <img src="Docs/Screenshots/exposure.png" width="170"> |
 
-| Gallery import | Nothing to import |
-| :---: | :---: |
-| <img src="Docs/Screenshots/gallery-picker.png" width="170"> | <img src="Docs/Screenshots/gallery-empty.png" width="170"> |
+| Info tip | Gallery import | Nothing to import |
+| :---: | :---: | :---: |
+| <img src="Docs/Screenshots/photo-info-tip.png" width="170"> | <img src="Docs/Screenshots/gallery-picker.png" width="170"> | <img src="Docs/Screenshots/gallery-empty.png" width="170"> |
 
 > Taken in the Simulator, which has no camera, so the viewfinder is black —
 > everything else is exactly what the SDK draws. The capture screens show the top
