@@ -109,7 +109,7 @@ add it to a `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/kwameaj67/Focal.git", from: "0.2.0")
+    .package(url: "https://github.com/kwameaj67/Focal.git", from: "1.0.0")
 ],
 targets: [
     .target(name: "YourApp", dependencies: [
@@ -122,10 +122,9 @@ Depend on `FocalPhoto` instead of the umbrella if you only capture
 stills — it links no microphone code, so the host needs no
 `NSMicrophoneUsageDescription`.
 
-While the package is on `0.x`, `from:` resolves within a single minor version:
-`from: "0.2.0"` means `>=0.2.0, <0.3.0`. Every `0.y` bump may break API, which
-is deliberate while the surface is still moving — and is why a `from: "0.1.0"`
-pin will not pick up 0.2.0 on its own.
+`from: "1.0.0"` follows semantic versioning — it resolves to the latest `1.x`
+(`>=1.0.0, <2.0.0`), picking up bug-fix and feature releases but not the next
+major, which is where any breaking API change would land.
 
 For local development you can also drag the `Focal` folder in as a
 local package.
