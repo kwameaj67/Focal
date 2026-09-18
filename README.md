@@ -104,8 +104,15 @@ Both screens share one layout, built to feel like a system camera:
 
 ### Swift Package Manager
 
-In Xcode: **File ▸ Add Package Dependencies…** and point at this repository, or
-add it to a `Package.swift`:
+**In Xcode:**
+
+1. **File ▸ Add Package Dependencies…**
+2. Paste the repo URL: `https://github.com/kwameaj67/Focal.git`
+3. Set the dependency rule to **Up to Next Major Version** from `1.0.0`.
+4. In the **Choose Package Products** dialog, add the product you need (see the
+   table below) to your app target, then click **Add Package**.
+
+**Or in a `Package.swift`:**
 
 ```swift
 dependencies: [
@@ -113,21 +120,29 @@ dependencies: [
 ],
 targets: [
     .target(name: "YourApp", dependencies: [
-        .product(name: "Focal", package: "Focal")
+        .product(name: "Focal", package: "Focal")   // or "FocalPhoto" / "FocalVideo"
     ])
 ]
 ```
 
-Depend on `FocalPhoto` instead of the umbrella if you only capture
-stills — it links no microphone code, so the host needs no
-`NSMicrophoneUsageDescription`.
+**Which product to add:**
+
+| Product | You get | Needs `NSMicrophoneUsageDescription` |
+| --- | --- | :---: |
+| `Focal` | Photo + video (the umbrella) | Yes |
+| `FocalPhoto` | Stills only | No |
+| `FocalVideo` | Recording only | Yes |
+| `FocalCore` | Session plumbing, no screens | No |
+
+Stills-only apps should add **`FocalPhoto`** rather than the umbrella: it links
+no microphone code, so you declare no microphone access (see
+[Architecture](#architecture) for why).
 
 `from: "1.0.0"` follows semantic versioning — it resolves to the latest `1.x`
 (`>=1.0.0, <2.0.0`), picking up bug-fix and feature releases but not the next
 major, which is where any breaking API change would land.
 
-For local development you can also drag the `Focal` folder in as a
-local package.
+For local development you can also drag the `Focal` folder in as a local package.
 
 ---
 
