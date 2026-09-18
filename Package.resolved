@@ -10,15 +10,6 @@
       }
     },
     {
-      "identity" : "purplewavekit-ios",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/PurpleWave/PurpleWaveKit-iOS",
-      "state" : {
-        "branch" : "main",
-        "revision" : "51641ea8afd8b5f3157cd2d0cf046bafcdfc6c7e"
-      }
-    },
-    {
       "identity" : "swift-syntax",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swiftlang/swift-syntax",

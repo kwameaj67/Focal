@@ -39,12 +39,12 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      # Same scheme and destination as test.yml. PurpleWaveCamera-Package is the
+      # Same scheme and destination as test.yml. camera-sdk-ios-Package is the
       # only scheme with a test action once the package has multiple products.
       - name: Run tests
         run: |
           xcodebuild test \
-            -scheme PurpleWaveCamera-Package \
+            -scheme camera-sdk-ios-Package \
             -destination "platform=iOS Simulator,name=iPhone 16" \
             -resultBundlePath ./TestResults.xcresult
 

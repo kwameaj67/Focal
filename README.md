@@ -1,36 +1,44 @@
-# PurpleWaveCamera
+# CameraSDK
 
 A Swift Package that renders a **camera capture screen** and a **landscape video
 recorder** for iOS. Built SwiftUI-first, with AVFoundation doing the capture
-work. Extracted and generalized from FieldTool's enhanced camera and video
-recorder so it can be dropped into any app with no FieldTool dependencies.
+work. Self-contained and domain-agnostic, so it can be dropped into any app.
 
 - **iOS 17+**, Swift 5.9.
 - **Callback / delegate based** — the SDK captures media and hands it back; your
   app decides how to store or upload it. **Nothing is written to disk for you**:
   photos are handed over as bytes, and recordings as a file you take ownership
   of.
-- **Two dependencies**, both resolved by SwiftPM:
+- **One dependency**, resolved by SwiftPM:
   [Transmission](https://github.com/nathantannar4/Transmission) (`2.16.x`) for
-  the zoom transition on the full-screen photo preview, and
-  [PurpleWaveKit](https://github.com/PurpleWave/PurpleWaveKit-iOS) for the
-  shared PurpleWave vocabulary.
+  the zoom transition on the full-screen photo preview.
+- **Polished capture UI** — a rounded, edge-to-edge preview card; a right-edge
+  tool rail (timer, aspect, exposure, FPS, lens, info); an on-screen **60 ⁄ 30
+  fps** toggle; press-to-scale controls; and a bundled rounded display font.
 
 ---
 
 ## Screenshots
 
-| Photo capture | Info tip | Self-timer counting down | Video recorder |
-| :---: | :---: | :---: | :---: |
-| <img src="Docs/Screenshots/photo-screen.png" width="170"> | <img src="Docs/Screenshots/photo-info-tip.png" width="170"> | <img src="Docs/Screenshots/capture-timer.png" width="170"> | <img src="Docs/Screenshots/video-screen.png" width="170"> |
+| Photo capture | Video recorder |
+| :---: | :---: |
+| <img src="Docs/Screenshots/photo-screen.png" width="230"> | <img src="Docs/Screenshots/video-screen.png" width="230"> |
 
-| Settings | Aspect ratio | Gallery import | Nothing to import |
+| Info tip | Self-timer | Settings | Aspect ratio |
 | :---: | :---: | :---: | :---: |
-| <img src="Docs/Screenshots/capture-settings.png" width="170"> | <img src="Docs/Screenshots/aspect-ratio.png" width="170"> | <img src="Docs/Screenshots/gallery-picker.png" width="170"> | <img src="Docs/Screenshots/gallery-empty.png" width="170"> |
+| <img src="Docs/Screenshots/photo-info-tip.png" width="170"> | <img src="Docs/Screenshots/capture-timer.png" width="170"> | <img src="Docs/Screenshots/capture-settings.png" width="170"> | <img src="Docs/Screenshots/aspect-ratio.png" width="170"> |
 
-> Taken in the Simulator, which has no camera, so the viewfinder is black.
-> Everything else is what the SDK draws. The video screen is shown in portrait,
-> where it blocks recording and asks the user to rotate.
+| Gallery import | Nothing to import |
+| :---: | :---: |
+| <img src="Docs/Screenshots/gallery-picker.png" width="170"> | <img src="Docs/Screenshots/gallery-empty.png" width="170"> |
+
+> Taken in the Simulator, which has no camera, so the viewfinder is black —
+> everything else is exactly what the SDK draws. The capture screens show the top
+> bar (close · flash/torch · settings), the right-edge tool rail with the **60
+> FPS** toggle highlighted, the centred shutter, and the gallery button in line
+> with the category selector; the settings/aspect/timer sheets open from either
+> the gear or a rail icon. Video now records in whatever orientation the device
+> is held — set `landscapeOnly` to restrict it to landscape.
 
 ---
 
@@ -52,17 +60,43 @@ Both screens share the same capture feature set:
 | Optional save-to-photo-library | ✅ | ✅ |
 | Multi-capture (screen stays open) | ✅ | ✅ |
 | Capture "drop into thumbnail" animation | ✅ | ✅ |
+| Right-edge tool rail (timer, aspect, exposure, FPS, lens, info) | ✅ | ✅ |
 | Settings sheet (flash/torch, aspect, timer, exposure, lens) | ✅ | ✅ |
+| Capture frame rate — 60 / 30 fps, on-screen toggle | ✅ | ✅ |
 | Aspect ratio — 4:3, 16:9, 1:1 | ✅ | ✅ |
 | Self-timer — off, 3s, 5s, 10s | ✅ | ✅ |
 | Manual exposure bias (device-reported range) | ✅ | ✅ |
 | Optional capture location | ✅ | ✅ |
 | Tap thumbnail → full-screen preview (zoom) | ✅ image | ✅ plays video |
-| Landscape-locked recording | — | ✅ |
+| Optional landscape-only recording (`landscapeOnly`) | — | ✅ |
 | Recording timer w/ optional auto-stop | — | ✅ |
 
-> The video screen is **landscape-only while recording**: in portrait it shows a
-> "rotate to landscape" overlay and disables the record button.
+> By default the recorder captures in **any orientation**. Set
+> `landscapeOnly = true` to restrict it to landscape — in portrait it then shows
+> a "rotate to landscape" overlay and disables the record button.
+
+---
+
+## On-screen layout
+
+Both screens share one layout, built to feel like a system camera:
+
+- **Preview card** — an edge-to-edge, rounded viewfinder filling the screen above
+  a slim control bar.
+- **Top bar** — close (`✕`), flash (photo) / torch (video), and settings.
+- **Right tool rail** — a vertically-centred column of quick tools: **Lens**
+  (device permitting), **Timer**, **Aspect**, **Exposure**, **FPS**, and
+  **Info**. Timer/Aspect/Exposure jump straight to their pane in the settings
+  sheet; FPS and Lens toggle in place; Info shows the aspect/badge tip. Backing
+  out of a rail-opened pane dismisses the sheet rather than returning to the grid.
+- **FPS toggle** — flips between **60** and **30** fps live; the starting value
+  is `defaultFrameRate`.
+- **Bottom bar** — the shutter / record button centred, the captured-media
+  thumbnail trailing it, and the gallery button on the leading edge, in line with
+  the category selector (which scrolls *under* it behind a soft fade).
+- **Feel** — every control scales down while held and springs back on release
+  (shutter `0.90`, icons and text `0.95`), and all on-screen text is set in a
+  bundled rounded display font.
 
 ---
 
@@ -75,16 +109,16 @@ add it to a `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/PurpleWave/PurpleWaveCamera-iOS.git", from: "0.2.0")
+    .package(url: "https://github.com/PurpleWave/camera-sdk-ios.git", from: "0.2.0")
 ],
 targets: [
     .target(name: "YourApp", dependencies: [
-        .product(name: "PurpleWaveCamera", package: "PurpleWaveCamera-iOS")
+        .product(name: "CameraSDK", package: "camera-sdk-ios")
     ])
 ]
 ```
 
-Depend on `PurpleWaveCameraPhoto` instead of the umbrella if you only capture
+Depend on `CameraSDKPhoto` instead of the umbrella if you only capture
 stills — it links no microphone code, so the host needs no
 `NSMicrophoneUsageDescription`.
 
@@ -93,7 +127,7 @@ While the package is on `0.x`, `from:` resolves within a single minor version:
 is deliberate while the surface is still moving — and is why a `from: "0.1.0"`
 pin will not pick up 0.2.0 on its own.
 
-For local development you can also drag the `PurpleWaveCamera` folder in as a
+For local development you can also drag the `CameraSDK` folder in as a
 local package.
 
 ---
@@ -140,7 +174,7 @@ camera working. Only a denied **camera** blocks the screen, which shows an
 
 ```swift
 import SwiftUI
-import PurpleWaveCamera
+import CameraSDK
 
 struct CaptureExample: View {
     @State private var showCamera = false
@@ -148,17 +182,17 @@ struct CaptureExample: View {
     var body: some View {
         Button("Take photos") { showCamera = true }
             .fullScreenCover(isPresented: $showCamera) {
-                PWCameraScreen(
-                    config: PWCameraConfig(
+                CSCameraScreen(
+                    config: CSCameraConfig(
                         categories: [
-                            PWCategory(id: "AMKT", title: "Profile"),
-                            PWCategory(id: "STICKER", title: "Sticker"),
-                            PWCategory(id: "WALK", title: "Walk Around")
+                            CSCategory(id: "AMKT", title: "Profile"),
+                            CSCategory(id: "STICKER", title: "Sticker"),
+                            CSCategory(id: "WALK", title: "Walk Around")
                         ],
                         startingCategoryID: "AMKT",
                         overlayLabel: "MO6759"
                     ),
-                    handlers: PWPhotoHandlers(
+                    handlers: CSPhotoHandlers(
                         onCapture: { result in
                             // result.imageData, result.image, result.category …
                             print("Captured a \(result.category?.title ?? "photo")")
@@ -179,13 +213,13 @@ struct CaptureExample: View {
 
 ```swift
 import UIKit
-import PurpleWaveCamera
+import CameraSDK
 
 final class MyViewController: UIViewController {
     func openCamera() {
-        let vc = PWCamera.makePhotoCapture(
-            config: PWCameraConfig(categories: [PWCategory("Profile")]),
-            handlers: PWPhotoHandlers(
+        let vc = CSCamera.makePhotoCapture(
+            config: CSCameraConfig(categories: [CSCategory("Profile")]),
+            handlers: CSPhotoHandlers(
                 onCapture: { result in /* store result */ },
                 onFinish:  { _ in /* controller dismisses itself */ }
             )
@@ -198,25 +232,27 @@ final class MyViewController: UIViewController {
 A delegate-based overload is also available:
 
 ```swift
-let vc = PWCamera.makePhotoCapture(config: config, delegate: self)
-// self: PWPhotoCaptureDelegate  (held weakly)
+let vc = CSCamera.makePhotoCapture(config: config, delegate: self)
+// self: CSPhotoCaptureDelegate  (held weakly)
 ```
 
 ### Video
 
 ```swift
-PWVideoScreen(
-    config: PWVideoConfig(
+CSVideoScreen(
+    config: CSVideoConfig(
         categories: [
-            PWCategory("Driving"),
-            PWCategory("Functional"),
-            PWCategory("Engine")
+            CSCategory("Driving"),
+            CSCategory("Functional"),
+            CSCategory("Engine")
         ],
         maxDuration: 180,                       // auto-stop after 3 minutes
+        landscapeOnly: true,                    // portrait shows a "rotate" prompt
+        defaultFrameRate: .fps60,               // user can toggle 60 ⁄ 30 on screen
         presetByCategoryID: ["Driving": .hd1080],
         defaultPreset: .hd720
     ),
-    handlers: PWVideoHandlers(
+    handlers: CSVideoHandlers(
         onRecord: { result in
             // result.fileURL is a local .mov you now own — move or upload it
         },
@@ -228,40 +264,43 @@ PWVideoScreen(
 )
 ```
 
-UIKit: `PWCamera.makeVideoRecorder(config:handlers:)` /
+UIKit: `CSCamera.makeVideoRecorder(config:handlers:)` /
 `makeVideoRecorder(config:delegate:)`.
 
 ---
 
 ## Configuration reference
 
-### `PWCameraConfig` (photo)
+### `CSCameraConfig` (photo)
 
 | Property | Default | Description |
 | --- | --- | --- |
 | `categories` | `[]` | Pills in the category scroll bar. Empty hides it. |
 | `startingCategoryID` | `nil` | Selected category on launch (falls back to first). |
 | `defaultFlashMode` | `.auto` | `.auto` / `.on` / `.off`. |
+| `defaultFrameRate` | `.fps60` | Starting capture frame rate; the user can toggle 60 ⁄ 30 fps from the rail. Falls back to the highest the device/format supports. |
 | `allowsGallery` | `true` | Show the library-import button. |
 | `allowsUltraWide` | `true` | Show the ultra-wide toggle (device permitting). |
-| `savesToPhotoLibrary` | `false` | Also save captures to the `FTCamera` album (name kept for continuity). |
+| `savesToPhotoLibrary` | `false` | Also save captures to the `CameraSDK` album. |
 | `capturesLocation` | `false` | Attach a location fix to each result. Needs `NSLocationWhenInUseUsageDescription`. |
 | `overlayLabel` | `nil` | Badge text shown in the info tip (e.g. an item ID). |
 | `outputDirectory` | `nil` | Unused by the photo screen — it writes no files. Present for symmetry with the video config. |
 
-### `PWVideoConfig` (video)
+### `CSVideoConfig` (video)
 
 | Property | Default | Description |
 | --- | --- | --- |
 | `categories` | `[]` | Segments in the category control. |
+| `landscapeOnly` | `false` | Restrict recording to landscape. When `true`, portrait shows a "rotate to landscape" overlay and disables the record button. |
 | `startingCategoryID` | `nil` | Selected category on launch. |
 | `maxDuration` | `nil` | Auto-stop length in seconds; `nil` = unlimited. |
 | `presetByCategoryID` | `[:]` | Per-category capture quality. |
 | `defaultPreset` | `.hd1080` | Quality for unlisted categories. |
+| `defaultFrameRate` | `.fps60` | Starting capture frame rate; the user can toggle 60 ⁄ 30 fps from the rail. Falls back to the highest the device/format supports. |
 | `allowsTorch` | `true` | Show the torch button. |
 | `allowsUltraWide` | `true` | Show the ultra-wide toggle. |
 | `allowsGallery` | `true` | Show the library-import button. |
-| `savesToPhotoLibrary` | `false` | Also save recordings to the `FTCamera` album (name kept for continuity). |
+| `savesToPhotoLibrary` | `false` | Also save recordings to the `CameraSDK` album. |
 | `capturesLocation` | `false` | Attach a location fix to each result. Needs `NSLocationWhenInUseUsageDescription`. |
 | `maxFileSizeMB` | `400` | Reject imported videos larger than this. |
 | `overlayLabel` | `nil` | Badge text shown in the info tip. |
@@ -293,7 +332,7 @@ that want to act on the selection as a set — uploading a batch together, or
 showing one "12 photos added" confirmation instead of twelve.
 
 ```swift
-PWPhotoHandlers(
+CSPhotoHandlers(
     onCapture: { result in
         // Fires 12 times for a 12-photo selection, one at a time.
         stage(result)
@@ -306,9 +345,9 @@ PWPhotoHandlers(
 ```
 
 ```swift
-extension MyViewController: PWPhotoCaptureDelegate {
-    func photoCapture(didCapture result: PWPhotoResult) { stage(result) }
-    func photoCapture(didImport results: [PWPhotoResult]) { upload(batch: results) }
+extension MyViewController: CSPhotoCaptureDelegate {
+    func photoCapture(didCapture result: CSPhotoResult) { stage(result) }
+    func photoCapture(didImport results: [CSPhotoResult]) { upload(batch: results) }
 }
 ```
 
@@ -320,11 +359,11 @@ Two things to know:
 - **It does not fire for live captures**, and it does not fire at all when a
   selection produced nothing.
 
-### `PWPhotoResult`
+### `CSPhotoResult`
 - `imageData: Data` — encoded (HEVC/JPEG) bytes.
 - `image: UIImage` — decoded from `imageData` on first access, then held. See
   [Memory](#memory) below.
-- `category: PWCategory?` — selected category (if any).
+- `category: CSCategory?` — selected category (if any).
 - `source: .camera | .gallery`
 - `orientation: UIDeviceOrientation` — device orientation at capture.
 - `metadata: [String: Any]?` — capture metadata when available.
@@ -334,10 +373,10 @@ Two things to know:
 - `capturedAt: Date` — for an import, the time of import rather than the
   asset's original creation date.
 
-### `PWVideoResult`
+### `CSVideoResult`
 - `fileURL: URL` — local `.mov` file; **ownership transfers to you** (move or
   delete it — the SDK writes to a temp directory by default).
-- `category: PWCategory?`
+- `category: CSCategory?`
 - `duration: TimeInterval`
 - `thumbnail: UIImage?` — at most 400×400.
 - `source: .camera | .gallery`
@@ -354,7 +393,7 @@ can — never one per photo taken:
 - The on-screen pile and grid keep a small thumbnail and the encoded bytes. The
   full-screen preview decodes the page you are looking at and its immediate
   neighbours, and releases the rest as you swipe.
-- `PWPhotoResult.image` decodes on first access and caches from then on, so a
+- `CSPhotoResult.image` decodes on first access and caches from then on, so a
   batch import hands you encoded bytes and nothing more until you ask for
   pixels. Reading `image` repeatedly — inside a SwiftUI `body`, say — costs
   nothing after the first read.
@@ -372,7 +411,7 @@ If you'd rather gate access yourself before presenting a screen:
 ```swift
 let denied = await MediaPermissions.ensureVideoPermissions()
 if denied == nil {
-    // present PWVideoScreen
+    // present CSVideoScreen
 } else {
     MediaPermissions.openSettings()
 }
@@ -386,7 +425,7 @@ so declining the library no longer takes down a working camera.
 | Function | Target |
 | --- | --- |
 | `cameraStatus()` / `requestCamera()` | Camera |
-| `microphoneStatus()` / `requestMicrophone()` | Microphone (`PurpleWaveCameraVideo` only) |
+| `microphoneStatus()` / `requestMicrophone()` | Microphone (`CameraSDKVideo` only) |
 | `photoLibraryStatus()` / `requestPhotoLibrary()` | Library read |
 | `requestPhotoLibraryAdd()` | Library add-only |
 | `ensurePhotoPermissions()` | Camera |
@@ -398,43 +437,43 @@ so declining the library no longer takes down a working camera.
 ## Architecture
 
 Four targets. Three do the work; the fourth is an umbrella that re-exports them
-so `import PurpleWaveCamera` gives you everything, as it always did.
+so `import CameraSDK` gives you everything, as it always did.
 
 ```
-PurpleWaveCameraCore ──┬── PurpleWaveCameraPhoto ──┐
-                       │                           ├── PurpleWaveCamera
-                       └── PurpleWaveCameraVideo ──┘        (umbrella)
+CameraSDKCore ──┬── CameraSDKPhoto ──┐
+                │                    ├── CameraSDK (umbrella)
+                └── CameraSDKVideo ──┘
 ```
 
 ```
 Sources/
-├─ PurpleWaveCameraCore/     everything both capture modes share
+├─ CameraSDKCore/     everything both capture modes share
 │  ├─ Engine/       CameraSessionController (session, device, queue, zoom,
 │  │                focus, lens swap), the preview UIViewRepresentable,
 │  │                orientation monitor, haptics, photo-library saving
 │  ├─ Gallery/      SwiftUI multi-select PHAsset picker + import helpers
 │  ├─ Permissions/  Camera / photo-library helpers (no microphone)
-│  ├─ Public/       PWCategory, shared result values, the PWCamera namespace
+│  ├─ Public/       CSCategory, shared result values, the CSCamera namespace
 │  └─ UI/           Category bar, drop animation, shared badges/overlays
-├─ PurpleWaveCameraPhoto/    stills: photo output, flash, PWCameraScreen
-├─ PurpleWaveCameraVideo/    recording: movie output, microphone, torch,
-│                            presets, PWVideoScreen
-└─ PurpleWaveCamera/         umbrella; re-exports the three above
+├─ CameraSDKPhoto/    stills: photo output, flash, CSCameraScreen
+├─ CameraSDKVideo/    recording: movie output, microphone, torch,
+│                            presets, CSVideoScreen
+└─ CameraSDK/         umbrella; re-exports the three above
 ```
 
 ### Which target to depend on
 
 | Depend on | You get | Microphone |
 | --- | --- | --- |
-| `PurpleWaveCamera` | Everything (photo + video) | Required |
-| `PurpleWaveCameraPhoto` | Stills only | **Not needed** |
-| `PurpleWaveCameraVideo` | Recording only | Required |
-| `PurpleWaveCameraCore` | Session plumbing, no screens | Not needed |
+| `CameraSDK` | Everything (photo + video) | Required |
+| `CameraSDKPhoto` | Stills only | **Not needed** |
+| `CameraSDKVideo` | Recording only | Required |
+| `CameraSDKCore` | Session plumbing, no screens | Not needed |
 
 The microphone column is the reason the package is split. Every
 `AVCaptureDevice` audio call — querying authorization, requesting it, and
-attaching the input — lives in `PurpleWaveCameraVideo`. A host that depends only
-on `PurpleWaveCameraPhoto` links none of it, so it needs no
+attaching the input — lives in `CameraSDKVideo`. A host that depends only
+on `CameraSDKPhoto` links none of it, so it needs no
 `NSMicrophoneUsageDescription` and discloses no microphone access in App Store
 privacy details. (Requesting microphone access without that Info.plist key
 crashes the app, so this is a correctness boundary, not just tidiness.)
@@ -460,11 +499,10 @@ Design notes:
 
 ### What was intentionally left out
 
-This SDK is a clean rebuild of FieldTool's camera mechanics. It does **not**
-include FieldTool business logic: Realm/CoreData persistence, the upload queue,
-telemetry, CDN wiring, Intercom, or VIN/barcode scanning. Those remain the
-host app's responsibility — feed the `PWPhotoResult` / `PWVideoResult` into your
-own pipeline.
+This SDK is purely camera and video capture. It does **not** include any
+application business logic: persistence, upload queues, telemetry, CDN wiring,
+analytics, or barcode scanning. Those remain the host app's responsibility —
+feed the `CSPhotoResult` / `CSVideoResult` into your own pipeline.
 
 ---
 

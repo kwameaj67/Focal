@@ -17,10 +17,10 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      # Scheme is PurpleWaveCamera-Package, not PurpleWaveCamera. Once the
+      # Scheme is camera-sdk-ios-Package, not CameraSDK. Once the
       # package declared more than one library product, SwiftPM started
       # generating a scheme per product plus a combined "-Package" scheme, and
-      # only the combined one carries a test action — `-scheme PurpleWaveCamera`
+      # only the combined one carries a test action — `-scheme CameraSDK`
       # fails with "not currently configured for the test action".
       #
       # Device name pinned to something recent enough to exist on the runner's default
@@ -30,7 +30,7 @@ jobs:
       - name: Run tests
         run: |
           xcodebuild test \
-            -scheme PurpleWaveCamera-Package \
+            -scheme camera-sdk-ios-Package \
             -destination "platform=iOS Simulator,name=iPhone 16" \
             -resultBundlePath ./TestResults.xcresult
 
