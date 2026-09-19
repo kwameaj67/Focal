@@ -11,6 +11,9 @@ import Foundation
 import FocalCore
 
 /// Receives events from a video recorder screen.
+///
+/// **Threading:** every method is called on the **main thread**, so it is safe
+/// to update UIKit / SwiftUI state directly from them without hopping queues.
 public protocol FCVideoRecorderDelegate: AnyObject {
     /// Called once per recorded (or imported) video.
     func videoRecorder(didRecord result: FCVideoResult)
@@ -37,17 +40,23 @@ public extension FCVideoRecorderDelegate {
 }
 
 /// Closure-based equivalent of `FCVideoRecorderDelegate`.
+///
+/// **Threading:** every closure is called on the **main thread**. The init
+/// wraps each one in a main-thread hop, so the guarantee holds no matter which
+/// internal queue produced the event — you can update UI state directly inside
+/// them. The properties are read-only from outside for the same reason: the
+/// guarantee is established at construction.
 public struct FCVideoHandlers {
-    public var onRecord: (FCVideoResult) -> Void
+    public private(set) var onRecord: (FCVideoResult) -> Void
 
     /// Called once per library selection with every recorded video it produced.
     ///
     /// Additional to `onRecord`, which still fires per item. Useful when the
     /// host wants to act on the whole set — uploading videos together, say —
     /// rather than one at a time. Defaults to a no-op.
-    public var onImport: ([FCVideoResult]) -> Void
-    public var onFinish: (FCFinishReason) -> Void
-    public var onError: (FCCameraError) -> Void
+    public private(set) var onImport: ([FCVideoResult]) -> Void
+    public private(set) var onFinish: (FCFinishReason) -> Void
+    public private(set) var onError: (FCCameraError) -> Void
 
     public init(
         onRecord: @escaping (FCVideoResult) -> Void,
@@ -55,9 +64,10 @@ public struct FCVideoHandlers {
         onFinish: @escaping (FCFinishReason) -> Void = { _ in },
         onError: @escaping (FCCameraError) -> Void = { _ in }
     ) {
-        self.onRecord = onRecord
-        self.onImport = onImport
-        self.onFinish = onFinish
-        self.onError = onError
+        // Deliver every event on the main thread so hosts can drive UI directly.
+        self.onRecord = { result in onMainThread { onRecord(result) } }
+        self.onImport = { results in onMainThread { onImport(results) } }
+        self.onFinish = { reason in onMainThread { onFinish(reason) } }
+        self.onError = { error in onMainThread { onError(error) } }
     }
 }

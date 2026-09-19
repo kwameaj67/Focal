@@ -342,6 +342,11 @@ Every callback except `onCapture` / `onRecord` is optional: the handler structs
 default them to no-ops, and the delegate protocols supply default
 implementations.
 
+**Threading.** Every callback — closure or delegate method — is delivered on the
+**main thread**, so you can update UIKit / SwiftUI state directly inside them
+without hopping queues. Capture runs on AVFoundation's background queues, but
+the SDK marshals each event back to the main thread before calling you.
+
 ### `didImport` / `onImport`
 
 The per-item callback fires as each asset lands, so a host that wants to stream
