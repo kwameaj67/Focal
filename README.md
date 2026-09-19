@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="Docs/focal-icon.png" width="120" alt="Focal icon" />
+</p>
+
 # Focal
 
 A Swift Package that renders a **camera capture screen** and a **landscape video
